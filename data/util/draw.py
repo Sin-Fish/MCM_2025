@@ -144,9 +144,9 @@ def draw_col_seaborn(x_col, y_col):
             y_label = f'列 {y_col}'
         
        
-        mask = y_data
-        x_data_filtered = x_data[mask]
-        y_data_filtered = y_data[mask]
+       
+        x_data_filtered = x_data
+        y_data_filtered = y_data
 
         plt.figure(figsize=(10, 6))
         sns.scatterplot(x=x_data_filtered, y=y_data_filtered)
@@ -174,7 +174,7 @@ if __name__ == "__main__":
 
     #draw_col_3d_matplotlib("孕妇BMI", "21号染色体的Z值", "Y染色体浓度")
 
-    draw_col_3d_matplotlib("孕妇BMI", "检测孕周", "Y染色体浓度")
+    #draw_col_3d_matplotlib("孕妇BMI", "检测孕周", "Y染色体浓度")
     #draw_col_hot_map_seaborn("孕妇BMI", "Y染色体浓度")
     # for i in range(data.shape[1]):
         
