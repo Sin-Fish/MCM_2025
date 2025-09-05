@@ -150,6 +150,39 @@ class LogisticRegressionModel:
                 
         return optimal_value, max_prob
 
+    def analyze_probability_trend(self, feature_index=0, value_range=None, target_class=1):
+        '''分析特征值与目标类别概率的关系趋势
+        Args:
+            feature_index: 特征索引
+            value_range: 特征值范围 (min, max)
+            target_class: 目标类别
+        Returns:
+            特征值数组和对应的概率数组
+        '''
+        if not self.is_trained:
+            raise ValueError("模型尚未训练，请先调用train方法")
+            
+        if value_range is None:
+            # 使用默认范围
+            value_range = (0, 10)  # 默认范围，实际使用时应该根据数据调整
+            
+        # 生成特征值范围
+        feature_values = np.linspace(value_range[0], value_range[1], 1000)
+        
+        # 计算每个特征值对应的概率
+        probabilities = []
+        
+        for value in feature_values:
+            # 创建样本数据（只设置指定特征，其他特征使用均值）
+            sample = np.zeros((1, len(self.scaler.mean_)))
+            sample[0, feature_index] = (value - self.scaler.mean_[feature_index]) / self.scaler.scale_[feature_index]
+            
+            # 预测概率
+            prob = self.model.predict_proba(sample)[0][target_class]
+            probabilities.append(prob)
+                
+        return feature_values, probabilities
+
 if __name__ == "__main__":
     data = Data.data
     
@@ -207,3 +240,18 @@ if __name__ == "__main__":
     print(f"  检测孕周范围: {week_min:.2f} - {week_max:.2f}")
     print(f"  最优孕周: {optimal_week:.2f}")
     print(f"  对应高Y染色体浓度概率: {max_prob:.4f}")
+    
+    # 分析概率趋势
+    weeks, probs = lr_model.analyze_probability_trend(
+        feature_index=week_index,
+        value_range=(week_min, week_max),
+        target_class=1
+    )
+    
+    # 找到概率大于0.5的孕周范围
+    high_prob_weeks = weeks[np.array(probs) > 0.5]
+    if len(high_prob_weeks) > 0:
+        print(f"\n高概率孕周范围:")
+        print(f"  概率>0.5的孕周范围: {high_prob_weeks[0]:.2f} - {high_prob_weeks[-1]:.2f}")
+    else:
+        print(f"\n没有孕周的概率超过0.5")
