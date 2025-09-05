@@ -9,14 +9,14 @@ class data_cleaner:
         
 
     
-    def scan_and_fix_column(self,col):
+    def scan_and_fix_column(self,col,fill_value):
         """
         param:
         col: 列号
         """
         
        
-        self.data.iloc[:, col].fillna(0, inplace=True)
+        self.data.iloc[:, col].fillna(fill_value, inplace=True)
 
     
     def limit_precision(self,col:int, precision:int):
@@ -53,6 +53,12 @@ class data_cleaner:
             os.makedirs(directory)
         self.data.to_excel(save_path, index=False)
 
+    def get_col_count(self):
+        """
+        获取列数
+        """
+        return self.data.shape[1]
+
 if __name__ == "__main__":
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -63,5 +69,4 @@ if __name__ == "__main__":
     }
 
     cleaner = data_cleaner(config)
-    
     cleaner.save_data(config["save_path"])
