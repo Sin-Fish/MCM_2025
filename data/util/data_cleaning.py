@@ -1,11 +1,13 @@
 import pandas as pd
 import openpyxl
 import os
+from data_manager import data_manager
 
 class data_cleaner:
     def __init__(self, config):
         self.config = config
-        self.data = data_cleaner.import_data(self.config["file_path"])
+        self.data_manager = data_manager(config)
+        
         
 
     
@@ -53,12 +55,6 @@ class data_cleaner:
         if directory and not os.path.exists(directory):
             os.makedirs(directory)
         self.data.to_excel(save_path, index=False)
-
-    def get_col_count(self):
-        """
-        获取列数
-        """
-        return self.data.shape[1]
 
     def get_col_count(self):
         """
