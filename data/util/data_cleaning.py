@@ -1,10 +1,11 @@
 import pandas as pd
+import openpyxl
 import os
 
 class data_cleaner:
     def __init__(self, config):
         self.config = config
-        self.data = data_cleaner.import_data(config["file_path"])
+        self.data = data_cleaner.import_data(self.config["file_path"])
         
 
     
@@ -45,7 +46,7 @@ class data_cleaner:
         """
         数据保存
         """
-       
+        
         directory = os.path.dirname(save_path)
        
         if directory and not os.path.exists(directory):
@@ -53,10 +54,14 @@ class data_cleaner:
         self.data.to_excel(save_path, index=False)
 
 if __name__ == "__main__":
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_dir = os.path.dirname(os.path.dirname(script_dir))
     config = {
-        "file_path": "../data/data.xlsx",  
-        "save_path": "../result/cleaned_data.xlsx",  
+        "file_path": os.path.join(project_dir, "data", "data.xlsx"),  
+        "save_path": os.path.join(project_dir, "data", "cleaned_data.xlsx"),  
     }
 
     cleaner = data_cleaner(config)
+    
     cleaner.save_data(config["save_path"])
