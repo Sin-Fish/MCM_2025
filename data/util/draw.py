@@ -32,6 +32,40 @@ def set_chinese_font():
 # 在模块加载时设置中文字体
 set_chinese_font()
 
+def draw_col_hot_map_seaborn(x_col, y_col,z_col):
+    """
+    绘制热力图
+    param:
+    x_col: x轴列号(数字索引)或列名(字符串)
+    y_col: y轴列号(数字索引)或列名(字符串)
+    """
+    try:
+        # 获取数据
+        if isinstance(x_col, str):
+            x_data = data[x_col]
+            x_label = x_col
+        else:
+            x_data = data.iloc[:, x_col]
+            x_label = f'列 {x_col}'
+            
+        if isinstance(y_col, str):
+            y_data = data[y_col]
+            y_label = y_col
+        else:
+            y_data = data.iloc[:, y_col]
+            y_label = f'列 {y_col}'
+        
+        # 创建热力图
+        plt.figure(figsize=(10, 6))
+        sns.heatmap(pd.DataFrame([x_data, y_data]).T, annot=True, cmap='coolwarm', fmt='.2f')
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
+        plt.title(f'热力图: {x_label} vs {y_label}')
+        plt.show()
+        
+    except Exception as e:
+        print(f"绘制热力图时发生错误: {e}")
+
 def draw_col_3d_matplotlib(x_col, y_col, z_col):
     """
     绘制3D散点图
@@ -131,17 +165,21 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(os.path.dirname(script_dir))
     config = {
-        "file_path": os.path.join(project_dir, "data", "cleaned_data.xlsx"),  
+        "file_path": os.path.join(project_dir, "data", "cleaned_data.csv"),  
         "save_path": os.path.join(project_dir, "data"),  
     }
     data = Data.data
     #draw_col_seaborn('孕妇BMI', 'Y染色体浓度')
+
+    draw_col_seaborn('检测孕周', 'Y染色体浓度')
     #draw_col_seaborn("生产次数", "胎儿是否健康")
 
     #draw_col_seaborn("生产次数", "Y染色体浓度")
 
-    draw_col_3d_matplotlib("孕妇BMI", "生产次数", "Y染色体浓度")
+    #draw_col_3d_matplotlib("孕妇BMI", "21号染色体的Z值", "Y染色体浓度")
 
+    draw_col_3d_matplotlib("孕妇BMI", "检测孕周", "Y染色体浓度")
+    #draw_col_hot_map_seaborn("孕妇BMI", "Y染色体浓度")
     # for i in range(data.shape[1]):
         
     #     draw_col_seaborn(data.columns[i], "Y染色体浓度")
