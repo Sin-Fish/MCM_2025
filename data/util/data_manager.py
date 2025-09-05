@@ -5,6 +5,7 @@ class data_manager:
     def __init__(self, config):
         self.config = config
         self.data = data_manager.import_data(self.config["file_path"])
+        
     def import_data(file_path):
         """
         数据导入
@@ -21,8 +22,10 @@ class data_manager:
         except Exception as e:
             print(f"导入数据文件 {file_path} 失败：{e}")
             return None
+            
         print(f"数据文件 {file_path} 导入成功")
         return data
+        
     def save_data(self, save_path):
         """
         数据保存
@@ -42,6 +45,15 @@ class data_manager:
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(os.path.dirname(script_dir))
+# 检查文件是否存在，优先使用CSV格式
+csv_file_path = os.path.join(project_dir, "data", "cut_cleaned_data.csv")
+xlsx_file_path = os.path.join(project_dir, "data", "cleaned_data.xlsx")
+
+if os.path.exists(csv_file_path):
+    file_path = csv_file_path
+else:
+    file_path = xlsx_file_path
+
 config = {
         "file_path": os.path.join(project_dir, "data", "cleaned_data.csv"),  
         
