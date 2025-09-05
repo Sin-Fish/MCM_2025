@@ -1,5 +1,4 @@
 import pandas as pd
-import openpyxl
 import os
 
 class data_manager:
@@ -13,14 +12,13 @@ class data_manager:
         """
         try:
             print(f"正在导入数据文件 {file_path}")
-            # 根据文件扩展名选择正确的读取方法
-            if file_path.endswith('.xlsx'):
+            # 根据文件扩展名自动选择读取方式
+            if file_path.endswith('.csv'):
+                data = pd.read_csv(file_path, encoding='utf-8-sig')
+            elif file_path.endswith(('.xlsx', '.xls')):
                 data = pd.read_excel(file_path)
-            elif file_path.endswith('.csv'):
-                data = pd.read_csv(file_path)
             else:
-                # 默认尝试读取，让pandas自动判断
-                data = pd.read_csv(file_path)
+                raise ValueError(f"不支持的文件格式: {file_path}")
         except Exception as e:
             print(f"导入数据文件 {file_path} 失败：{e}")
             return None
@@ -37,7 +35,7 @@ class data_manager:
        
         if directory and not os.path.exists(directory):
             os.makedirs(directory)
-        self.data.to_excel(save_path, index=False)
+        self.data.to_csv(save_path, index=False, encoding='utf-8-sig')
 
     def get_col_count(self):
         """
@@ -57,7 +55,7 @@ else:
     file_path = xlsx_file_path
 
 config = {
-        "file_path": file_path,  
+        "file_path": os.path.join(project_dir, "data", "cleaned_data.csv"),  
         
     }
 Data = data_manager(config)
