@@ -8,6 +8,12 @@ import matplotlib.pyplot as plt
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 
+import matplotlib.pyplot as plt
+
+# 修复路径问题 - 使用相对路径添加项目根目录
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
+
 from data.util.data_manager import Data
 from model.k_means import KMeansCluster
 from data.util.draw import draw_col_seaborn
