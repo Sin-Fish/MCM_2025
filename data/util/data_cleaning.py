@@ -17,7 +17,7 @@ class data_cleaner:
         
        
         self.data.iloc[:, col].fillna(fill_value, inplace=True)
-        self.data.iloc[:, col].fillna(fill_value, inplace=True)
+       
 
     
     def limit_precision(self,col:int, precision:int):
