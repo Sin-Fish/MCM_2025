@@ -48,7 +48,7 @@ class data_manager:
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(os.path.dirname(script_dir))
 # 检查文件是否存在，优先使用CSV格式
-csv_file_path = os.path.join(project_dir, "data", "cleaned_data.csv")
+csv_file_path = os.path.join(project_dir, "data", "cut_cleaned_data.csv")
 xlsx_file_path = os.path.join(project_dir, "data", "cleaned_data.xlsx")
 
 if os.path.exists(csv_file_path):

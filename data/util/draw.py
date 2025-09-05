@@ -143,12 +143,8 @@ def draw_col_seaborn(x_col, y_col):
             y_data = data.iloc[:, y_col]
             y_label = f'列 {y_col}'
         
-        # 筛选 y 值 >= 0.04 的数据点
-        if y_col == 'Y染色体浓度':
-            
-            mask = y_data >= 0.04
-        else:
-            mask = y_data
+       
+        mask = y_data
         x_data_filtered = x_data[mask]
         y_data_filtered = y_data[mask]
 
