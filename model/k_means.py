@@ -4,6 +4,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data.util.data_manager import Data
 from sklearn.cluster import KMeans
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 
 class KMeansCluster:
     def __init__(self, n_clusters=3, random_state=42):
@@ -56,10 +58,73 @@ class KMeansCluster:
         '''
         return self.model.inertia_
 
+    def plot_clusters(self, X, x_col_name=None, y_col_name=None):
+        '''绘制聚类结果
+        Args:
+            X: 特征矩阵 (n_samples, n_features)
+            x_col_name: x轴特征名称
+            y_col_name: y轴特征名称
+        '''
+        if self.labels_ is None:
+            raise ValueError("模型尚未训练，请先调用train方法")
+            
+        # 设置中文字体支持
+        self._set_chinese_font()
+        
+        # 获取数据
+        x_data = X.iloc[:, 0] if x_col_name is None else X[x_col_name]
+        y_data = X.iloc[:, 1] if y_col_name is None else X[y_col_name]
+        
+        # 创建图形
+        plt.figure(figsize=(10, 8))
+        
+        # 为每个簇绘制不同颜色的点
+        colors = plt.cm.viridis(np.linspace(0, 1, self.n_clusters))
+        for i in range(self.n_clusters):
+            cluster_points = self.labels_ == i
+            plt.scatter(x_data[cluster_points], y_data[cluster_points], 
+                       c=[colors[i]], label=f'簇 {i}', alpha=0.7, s=50)
+        
+        # 绘制聚类中心
+        if self.cluster_centers_ is not None:
+            center_x = self.cluster_centers_[:, 0] if x_col_name is None else self.cluster_centers_[:, X.columns.get_loc(x_col_name)]
+            center_y = self.cluster_centers_[:, 1] if y_col_name is None else self.cluster_centers_[:, X.columns.get_loc(y_col_name)]
+            plt.scatter(center_x, center_y, c='red', marker='x', s=200, linewidths=3, label='聚类中心')
+        
+        # 添加标签和标题
+        plt.xlabel(x_col_name if x_col_name else X.columns[0])
+        plt.ylabel(y_col_name if y_col_name else X.columns[1])
+        plt.title('K-means聚类结果')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.show()
+
+    def _set_chinese_font(self):
+        '''设置中文字体支持'''
+        # 定义可能的中文字体
+        font_names = ['SimHei', 'Microsoft YaHei', 'STHeiti', 'FangSong']
+        available_fonts = [f.name for f in fm.fontManager.ttflist]
+        
+        # 尝试设置中文字体
+        for font_name in font_names:
+            if font_name in available_fonts:
+                plt.rcParams['font.sans-serif'] = [font_name]
+                break
+        else:
+            # 如果常用字体不可用，尝试使用其他中文字体
+            chinese_fonts = [f for f in available_fonts if any(chinese_char in f for chinese_char in ['Sim', 'Kai', 'Fang', 'Microsoft', 'ST'])]
+            if chinese_fonts:
+                plt.rcParams['font.sans-serif'] = [chinese_fonts[0]]
+        
+        # 解决负号显示问题
+        plt.rcParams['axes.unicode_minus'] = False
+
 if __name__ == "__main__":
     data = Data.data
+    #feature = ['检测孕周', '孕妇BMI']
+    feature = ['Y染色体浓度', '孕妇BMI']
     # 选择用于聚类的特征
-    X = data[['检测孕周', '孕妇BMI']].dropna()
+    X = data[feature].dropna()
     
     # 创建并训练K-means模型
     kmeans = KMeansCluster(n_clusters=3)
@@ -75,3 +140,6 @@ if __name__ == "__main__":
     sample_data = X[:5]
     predictions = kmeans.predict(sample_data)
     print("示例数据的聚类预测:", predictions)
+    
+    # 绘制聚类结果
+    kmeans.plot_clusters(X, feature[0], feature[1])

@@ -1,8 +1,12 @@
 import pandas as pd
 import os
 import sys
-system_path=sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# 添加项目根目录到Python路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 from config import file_name
+
 class data_manager:
     def __init__(self, config):
         self.config = config
@@ -20,7 +24,8 @@ class data_manager:
             elif file_path.endswith(('.xlsx', '.xls')):
                 data = pd.read_excel(file_path)
             else:
-                raise ValueError(f"不支持的文件格式: {file_path}")
+                # 默认尝试读取CSV
+                data = pd.read_csv(file_path, encoding='utf-8-sig')
         except Exception as e:
             print(f"导入数据文件 {file_path} 失败：{e}")
             return None
@@ -37,7 +42,7 @@ class data_manager:
        
         if directory and not os.path.exists(directory):
             os.makedirs(directory)
-        self.data.to_csv(save_path, index=False, encoding='utf-8-sig')
+        self.data.to_excel(save_path, index=False)
 
     def get_col_count(self):
         """
@@ -48,16 +53,21 @@ class data_manager:
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(os.path.dirname(script_dir))
 
-csv_file_path = os.path.join(project_dir, "data", f"{file_name}.csv")
-xlsx_file_path = os.path.join(project_dir, "data", f"{file_name}.xlsx")
+# 检查文件是否存在，优先使用CSV格式
+csv_file_path = os.path.join(project_dir, "data", "cut_cleaned_data.csv")
+xlsx_file_path = os.path.join(project_dir, "data", "data.xlsx")
 
+# 根据实际存在的文件设置路径
 if os.path.exists(csv_file_path):
     file_path = csv_file_path
+elif os.path.exists(xlsx_file_path):
+    file_path = xlsx_file_path
 else:
+    # 如果都不存在，使用默认的xlsx文件路径
     file_path = xlsx_file_path
 
 config = {
-        "file_path": os.path.join(project_dir, "data", f"{file_name}.csv"),  
+        "file_path": file_path,  
         
     }
 Data = data_manager(config)
