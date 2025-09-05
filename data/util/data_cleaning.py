@@ -10,12 +10,14 @@ class data_cleaner:
 
     
     def scan_and_fix_column(self,col,fill_value):
+    def scan_and_fix_column(self,col,fill_value):
         """
         param:
         col: 列号
         """
         
        
+        self.data.iloc[:, col].fillna(fill_value, inplace=True)
         self.data.iloc[:, col].fillna(fill_value, inplace=True)
 
     
@@ -52,6 +54,12 @@ class data_cleaner:
         if directory and not os.path.exists(directory):
             os.makedirs(directory)
         self.data.to_excel(save_path, index=False)
+
+    def get_col_count(self):
+        """
+        获取列数
+        """
+        return self.data.shape[1]
 
     def get_col_count(self):
         """
