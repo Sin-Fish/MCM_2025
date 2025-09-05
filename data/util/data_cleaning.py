@@ -17,6 +17,7 @@ class data_cleaner:
         
        
         self.data.iloc[:, col].fillna(fill_value, inplace=True)
+        self.data.iloc[:, col].fillna(fill_value, inplace=True)
 
     
     def limit_precision(self,col:int, precision:int):
@@ -52,6 +53,12 @@ class data_cleaner:
         if directory and not os.path.exists(directory):
             os.makedirs(directory)
         self.data.to_excel(save_path, index=False)
+
+    def get_col_count(self):
+        """
+        获取列数
+        """
+        return self.data.shape[1]
 
     def get_col_count(self):
         """
