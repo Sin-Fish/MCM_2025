@@ -4,8 +4,9 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.font_manager as fm
-
-from data_manager import Data
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from data.util.data_manager import Data
 
 
 def set_chinese_font():
