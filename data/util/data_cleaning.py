@@ -10,6 +10,7 @@ class data_cleaner:
 
     
     def scan_and_fix_column(self,col,fill_value):
+    def scan_and_fix_column(self,col,fill_value):
         """
         param:
         col: 列号
