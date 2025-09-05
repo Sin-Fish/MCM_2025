@@ -23,9 +23,23 @@ def plot_cluster_data(cluster_id, data, title):
     plt.grid(True, alpha=0.3)
     plt.show()
 
+def days_to_weeks_days(days):
+    """将天数转换为周数和天数的格式"""
+    weeks = int(days // 7)
+    remaining_days = int(days % 7)
+    return weeks, remaining_days
+
+def format_gestational_age(days):
+    """格式化孕周显示"""
+    weeks, days = days_to_weeks_days(days)
+    if days == 0:
+        return f"{weeks}周"
+    else:
+        return f"{weeks}周+{days}天"
+
 if __name__ == "__main__":
     data = Data.data
-   
+   #统计每个孕妇达标孕周，
     #feature = ['检测孕周', '孕妇BMI']
     feature = ['孕妇BMI',"Y染色体浓度"]
     
@@ -58,131 +72,90 @@ if __name__ == "__main__":
     elif len(feature) == 1:
         kmeans.plot_clusters(X, feature[0])
 
-    # 分离不同类别的数据
-    clustered_data = X.copy()
-    clustered_data['cluster'] = kmeans.get_labels()
+    # 导入first_y.csv,并根据聚类结果分离不同类别的数据
+    first_y_file_path = os.path.join(project_root, "data", "first_y.csv")
     
-    # 对每类数据进行可视化
-    print("\n=== 各簇数据可视化 ===")
-    for cluster_id in range(kmeans.n_clusters):
-        cluster_data = clustered_data[clustered_data['cluster'] == cluster_id]
-        print(f"\n簇 {cluster_id} 数据可视化:")
+    # 尝试不同的编码方式读取CSV文件
+    try:
+        first_y_data = pd.read_csv(first_y_file_path, encoding='utf-8')
+    except UnicodeDecodeError:
+        try:
+            first_y_data = pd.read_csv(first_y_file_path, encoding='gbk')
+        except UnicodeDecodeError:
+            first_y_data = pd.read_csv(first_y_file_path, encoding='latin1')
+    
+    # 为了进行聚类分析，我们需要从first_y_data中提取与之前聚类相同的特征
+    clustering_features = ['孕妇BMI', 'Y染色体浓度']
+    first_y_X = first_y_data[clustering_features].dropna()
+    
+    # 对first_y_data进行聚类预测
+    first_y_clusters = kmeans.predict(first_y_X)
+    
+    # 将聚类结果添加到数据中
+    first_y_X_with_clusters = first_y_X.copy()
+    first_y_X_with_clusters['cluster'] = first_y_clusters
+    
+    # 根据聚类结果分离不同类别的数据
+    clusters = {}
+    for i in range(kmeans.n_clusters):
+        clusters[i] = first_y_X_with_clusters[first_y_X_with_clusters['cluster'] == i]
+    
+    print("\n=== 根据聚类结果分类的数据统计 ===")
+    for i in range(kmeans.n_clusters):
+        print(f"簇 {i}: {len(clusters[i])} 个样本")
+    
+    # 计算各类别中检测孕周的90%分位数作为最佳时点
+    # 注意：first_y_data中需要有检测孕周这一列
+    first_y_data_with_clusters = first_y_data.loc[first_y_X.index].copy()
+    first_y_data_with_clusters['cluster'] = first_y_clusters
+    
+    print("\n=== 各聚类类别90%分位孕周 ===")
+    cluster_week_90 = {}
+    for i in range(kmeans.n_clusters):
+        cluster_data = first_y_data_with_clusters[first_y_data_with_clusters['cluster'] == i]
         if len(cluster_data) > 0:
-            # 可视化该簇的检测孕周与Y染色体浓度关系
-            # 注意：这里需要原始数据，而不是当前特征数据
-            # 所以我们需要从原始数据中筛选出属于该簇的样本
-            original_indices = cluster_data.index
-            original_data_for_cluster = data.loc[original_indices]
-            
-            # 绘制检测孕周与Y染色体浓度的关系
-            if len(original_data_for_cluster) > 0:
-                # 创建临时数据用于绘图
-                temp_data = original_data_for_cluster.copy()
-                temp_data = temp_data[['检测孕周', 'Y染色体浓度']].dropna()
-                if len(temp_data) > 0:
-                    print(f"簇 {cluster_id} 包含 {len(temp_data)} 个有效样本")
-                    # 绘制散点图
-                    plot_cluster_data(cluster_id, temp_data, "聚类结果")
-                    
-    # 对每类数据进行逻辑回归确定检测孕周为什么时候最佳
-    print("\n=== 各簇逻辑回归分析 ===")
-    optimal_weeks = []
+            week_90 = np.percentile(cluster_data['检测孕周'], 10)
+            cluster_week_90[i] = week_90
+            print(f"簇 {i} 的90%分位孕周: {format_gestational_age(week_90)} ({week_90:.2f}天)")
     
-    for cluster_id in range(kmeans.n_clusters):
-        cluster_data = clustered_data[clustered_data['cluster'] == cluster_id]
-        print(f"\n簇 {cluster_id} 逻辑回归分析:")
-        
-        if len(cluster_data) > 10:  # 确保有足够的样本进行分析
-            # 获取该簇在原始数据中的索引
-            original_indices = cluster_data.index
-            original_data_for_cluster = data.loc[original_indices]
-            
-            # 准备逻辑回归所需的数据
-            analysis_data = original_data_for_cluster[['检测孕周', 'Y染色体浓度']].dropna()
-            
-            if len(analysis_data) > 10:  # 确保有足够的样本
-                # 创建二分类目标变量：Y染色体浓度是否高于该簇的中位数
-                y_median = analysis_data['Y染色体浓度'].median()
-                y_binary = (analysis_data['Y染色体浓度'] > y_median).astype(int)
-                
-                # 特征为检测孕周
-                X_lr = analysis_data[['检测孕周']]
-                y_lr = y_binary
-                
-                if len(X_lr) == len(y_lr) and len(X_lr) > 0:
-                    # 创建并训练逻辑回归模型
-                    lr_model = LogisticRegressionModel(C=1.0)
-                    lr_model.train(X_lr, y_lr)
-                    
-                    # 评估模型
-                    accuracy = lr_model.evaluate(X_lr, y_lr)
-                    print(f"  模型准确率: {accuracy:.4f}")
-                    
-                    # 获取模型系数
-                    coef = lr_model.get_coefficients()
-                    intercept = lr_model.get_intercept()
-                    print(f"  模型系数: {coef}")
-                    print(f"  模型截距: {intercept}")
-                    
-                    # 分析哪个孕周最佳
-                    # 生成孕周范围
-                    weeks = np.linspace(analysis_data['检测孕周'].min(), 
-                                      analysis_data['检测孕周'].max(), 100)
-                    
-                    # 计算每个孕周对应的高Y染色体浓度概率
-                    prob_high = []
-                    for week in weeks:
-                        prob = lr_model.predict_proba(np.array([[week]]))
-                        prob_high.append(prob[0][1])  # 高浓度的概率
-                    
-                    # 绘制概率曲线
-                    plt.figure(figsize=(10, 6))
-                    plt.plot(weeks, prob_high, 'b-', linewidth=2, label='高Y染色体浓度概率')
-                    
-                    # 添加中位数线作为参考
-                    plt.axhline(y=0.5, color='r', linestyle='--', alpha=0.7, label='决策边界(0.5)')
-                    
-                    plt.xlabel('检测孕周')
-                    plt.ylabel('高Y染色体浓度概率')
-                    plt.title(f'簇 {cluster_id} - 检测孕周与高Y染色体浓度概率关系')
-                    plt.legend()
-                    plt.grid(True, alpha=0.3)
-                    plt.show()
-                    
-                    # 找到概率最高的孕周
-                    best_week_idx = np.argmax(prob_high)
-                    best_week = weeks[best_week_idx]
-                    best_prob = prob_high[best_week_idx]
-                    
-                    # 找到概率大于0.5的孕周范围
-                    high_prob_indices = np.where(np.array(prob_high) > 0.5)[0]
-                    if len(high_prob_indices) > 0:
-                        high_prob_weeks = weeks[high_prob_indices]
-                        week_range_start = high_prob_weeks[0]
-                        week_range_end = high_prob_weeks[-1]
-                        print(f"  高概率孕周范围(概率>0.5): {week_range_start:.2f} - {week_range_end:.2f}周")
-                    else:
-                        print("  没有孕周的概率超过0.5")
-                    
-                    print(f"  最佳检测孕周(概率最高): {best_week:.2f}周")
-                    print(f"  对应高Y染色体浓度概率: {best_prob:.4f}")
-                    
-                    optimal_weeks.append((cluster_id, best_week, best_prob, week_range_start if 'high_prob_indices' in locals() and len(high_prob_indices) > 0 else None, week_range_end if 'high_prob_indices' in locals() and len(high_prob_indices) > 0 else None))
-                else:
-                    print("  样本数据不足，无法进行逻辑回归分析")
-            else:
-                print("  有效数据不足，无法进行逻辑回归分析")
-        else:
-            print("  样本数量不足，无法进行逻辑回归分析")
+    # 取总体90%分位孕周作为最佳时点
+    overall_week_90 = np.percentile(first_y_data_with_clusters['检测孕周'], 10)
+    print(f"\n总体90%分位孕周: {format_gestational_age(overall_week_90)} ({overall_week_90:.2f}天)")
     
-    # 输出总体最佳孕周
-    print("\n=== 总体分析结果 ===")
-    if optimal_weeks:
-        for item in optimal_weeks:
-            cluster_id, week, prob = item[0], item[1], item[2]
-            if item[3] is not None and item[4] is not None:
-                print(f"簇 {cluster_id}: 最佳孕周 {week/7:.0f}周{week%7:.0f}日 (高Y染色体浓度概率: {prob:.4f}), 推荐范围 {item[3]/7:.0f}-{item[4]/7:.0f}周")
-            else:
-                print(f"簇 {cluster_id}: 最佳孕周 {week/7:.0f}周{week%7:.0f}日 (高Y染色体浓度概率: {prob:.4f})")
-    else:
-        print("没有足够的数据进行分析")
+    # 可视化各类别的孕周分布
+    plt.figure(figsize=(12, 8))
+    
+    colors = plt.cm.viridis(np.linspace(0, 1, kmeans.n_clusters))
+    
+    for i in range(kmeans.n_clusters):
+        cluster_data = first_y_data_with_clusters[first_y_data_with_clusters['cluster'] == i]
+        if len(cluster_data) > 0:
+            plt.hist(cluster_data['检测孕周'], bins=20, alpha=0.7, color=colors[i], label=f'簇 {i}')
+    
+    plt.axvline(overall_week_90, color='black', linestyle='--', linewidth=2, 
+                label=f'总体90%分位 ({format_gestational_age(overall_week_90)})')
+    plt.xlabel('检测孕周 (天)')
+    plt.ylabel('频数')
+    plt.title('不同聚类类别下检测孕周的分布')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
+    
+    # 显示每个簇的特征描述
+    print("\n=== 各簇特征描述 ===")
+    for i in range(kmeans.n_clusters):
+        cluster_data = first_y_data_with_clusters[first_y_data_with_clusters['cluster'] == i]
+        if len(cluster_data) > 0:
+            print(f"\n簇 {i}:")
+            print(f"  孕妇BMI范围: [{cluster_data['孕妇BMI'].min():.2f}, {cluster_data['孕妇BMI'].max():.2f}]")
+            print(f"  孕妇BMI均值: {cluster_data['孕妇BMI'].mean():.2f}")
+            print(f"  Y染色体浓度范围: [{cluster_data['Y染色体浓度'].min():.2f}, {cluster_data['Y染色体浓度'].max():.2f}]")
+            print(f"  Y染色体浓度均值: {cluster_data['Y染色体浓度'].mean():.2f}")
+            
+            # 格式化显示孕周信息
+            min_weeks, min_days = days_to_weeks_days(cluster_data['检测孕周'].min())
+            max_weeks, max_days = days_to_weeks_days(cluster_data['检测孕周'].max())
+            mean_weeks, mean_days = days_to_weeks_days(cluster_data['检测孕周'].mean())
+            
+            print(f"  检测孕周范围: [{format_gestational_age(cluster_data['检测孕周'].min())}, {format_gestational_age(cluster_data['检测孕周'].max())}]")
+            print(f"  检测孕周均值: {format_gestational_age(cluster_data['检测孕周'].mean())}")

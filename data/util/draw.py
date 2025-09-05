@@ -161,13 +161,11 @@ def draw_col_seaborn(x_col, y_col):
 if __name__ == "__main__":    
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(os.path.dirname(script_dir))
-    config = {
-        "file_path": os.path.join(project_dir, "data", "cleaned_data.csv"),  
-        "save_path": os.path.join(project_dir, "data"),  
-    }
+    
     data = Data.data
     #draw_col_seaborn('孕妇BMI', 'Y染色体浓度')
 
+    draw_col_seaborn('更新孕周', 'Y染色体浓度')
     draw_col_seaborn('检测孕周', 'Y染色体浓度')
     #draw_col_seaborn("生产次数", "胎儿是否健康")
 
@@ -175,7 +173,7 @@ if __name__ == "__main__":
 
     #draw_col_3d_matplotlib("孕妇BMI", "21号染色体的Z值", "Y染色体浓度")
 
-    #draw_col_3d_matplotlib("孕妇BMI", "检测孕周", "Y染色体浓度")
+    draw_col_3d_matplotlib("孕妇BMI", "更新孕周", "Y染色体浓度")
     #draw_col_hot_map_seaborn("孕妇BMI", "Y染色体浓度")
     # for i in range(data.shape[1]):
         

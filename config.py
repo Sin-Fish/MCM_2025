@@ -6,4 +6,4 @@ config = {
 
 }
 
-file_name = "cut_cleaned_data"
+file_name = "new_cleaned_data_male"

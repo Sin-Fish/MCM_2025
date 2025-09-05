@@ -285,14 +285,35 @@ class data_cleaner:
             print("数据未加载")
             return None
         return self.data.shape[1]
-
+    
+    def date_standardization(self):
+        """
+        数据日期统一处理,按照YYYY/MM/DD格式
+        """
+        if self.data is None:
+            print("数据未加载")
+            return
+        
+        # 创建日期转换字典
+        date_transforms = {
+            '检测日期': self._standardize_exam_date_format,
+            '末次月经': self._standardize_lmp_format,
+            '检测孕周': self._standardize_gestational_week_format
+        }
+        
+        # 遍历数据，对每一行应用日期转换
+        for index, row in self.data.iterrows():
+            for col_name, transform_func in date_transforms.items():
+                if col_name in self.data.columns and pd.notna(row[col_name]):
+                    # 调用对应的转换函数处理日期
+                    transform_func(index, row[col_name])
 if __name__ == "__main__":
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(os.path.dirname(script_dir))
     config = {
         "file_path": os.path.join(project_dir, "data", "男胎检测数据.xlsx"),  
-        "save_path": os.path.join(project_dir, "data", "cleaned_data_male.csv"),  # 改为CSV格式
+        "save_path": os.path.join(project_dir, "data", "date_cleaned_data_male.xlsx"),  # 改为CSV格式
     }
 
     # 创建数据清洗器实例
@@ -311,7 +332,7 @@ if __name__ == "__main__":
     
     # 执行统一的数据清理过程
     cleaner.unified_clean_process()
-    
+    cleaner.date_standardization()
     # 再次检查缺失值，确认清理效果
     missing_info = cleaner.check_missing_values()
     if missing_info is not None:

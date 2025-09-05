@@ -1,13 +1,15 @@
 import os
 import sys
-system_path=sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
 from data.util.data_manager import Data
 from model.MultiLinearRegressor import MultiLinearRegressor
 
 
 if __name__ == "__main__":  
     data = Data.data
-    X = data[['检测孕周', '孕妇BMI']]
+    X = data[['更新孕周', '孕妇BMI']]
     y = data['Y染色体浓度']
     regressor = MultiLinearRegressor()
     regressor.train(X, y)
