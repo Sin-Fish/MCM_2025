@@ -20,4 +20,5 @@ rad.json
 *.flf
 #Test results file
 TestResults.xml
-~$data.xlsx
+# Python virtual environment
+venv/
