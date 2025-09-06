@@ -3,9 +3,8 @@ import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from lifelines import KaplanMeierFitter
 
-# 定义检查时间特征名称
+
 check_time = '检测孕周'
 
 # 修复路径问题 - 使用相对路径添加项目根目录
@@ -14,6 +13,7 @@ sys.path.append(project_root)
 
 from data.util.data_manager import Data
 from model.k_means import KMeansCluster
+from model.km_model import KMModel
 from data.util.draw import draw_col_seaborn
 from model.logistic_regression import LogisticRegressionModel
 
@@ -126,7 +126,7 @@ def perform_kmeans_analysis(data, n_clusters=4):
 
 def perform_km_analysis(data, kmeans_model, feature):
     """
-    执行Kaplan-Meier生存分析
+    执行Kaplan-Meier生存分析（使用新模型）
     
     参数:
     data: 原始数据
@@ -152,23 +152,31 @@ def perform_km_analysis(data, kmeans_model, feature):
         cluster_count = len(km_data_clean[km_data_clean['cluster'] == i])
         print(f"簇 {i}: {cluster_count} 个孕妇")
     
-    # 使用lifelines库绘制Kaplan-Meier曲线
+    # 使用新的KM模型进行分析
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    # 为每个簇绘制KM曲线
-    km_fitters = {}
+    # 为每个簇拟合KM曲线
+    km_models = {}
+    km_fitters = {}  # 用于兼容旧的分析方法
+    
     for cluster_id in range(kmeans_model.n_clusters):
         cluster_data = km_data_clean[km_data_clean['cluster'] == cluster_id]
         if len(cluster_data) > 0:
-            # 创建KaplanMeierFitter实例
-            kmf = KaplanMeierFitter()
-            km_fitters[cluster_id] = kmf
+            # 创建KM模型实例
+            km_models[cluster_id] = KMModel()
             
             # 拟合数据
-            kmf.fit(cluster_data['事件时间'], event_observed=cluster_data['事件发生'], label=f'簇 {cluster_id}')
+            km_models[cluster_id].fit(
+                cluster_data['事件时间'], 
+                cluster_data['事件发生'], 
+                label=f'簇 {cluster_id}'
+            )
+            
+            # 为了兼容旧的分析方法，我们保留原始的KaplanMeierFitter实例
+            km_fitters[cluster_id] = km_models[cluster_id].model
             
             # 绘制曲线
-            kmf.plot_survival_function(ax=ax)
+            km_models[cluster_id].plot(ax=ax, ci_show=False)
     
     # 添加10%的参考线
     ax.axhline(y=0.1, color='red', linestyle='--', alpha=0.7, label='10%未达标参考线')
@@ -181,48 +189,10 @@ def perform_km_analysis(data, kmeans_model, feature):
     plt.tight_layout()
     plt.show()
     
-    # 计算各簇的中位生存时间和90%分位数时间
+    # 使用KM模型中的分析方法计算结果
     print("\n=== 各簇Kaplan-Meier分析结果 ===")
-    results = {}
-    for cluster_id in range(kmeans_model.n_clusters):
-        if cluster_id in km_fitters:
-            kmf = km_fitters[cluster_id]
-            median_time = kmf.median_survival_time_
-            if not np.isnan(median_time):
-                print(f"簇 {cluster_id} 中位生存时间: {format_gestational_age(median_time)} (原始值: {median_time:.2f}天)")
-            else:
-                print(f"簇 {cluster_id} 中位生存时间: 无法计算（数据不足）")
-            
-            # 计算90%分位数时间（即10%的孕妇仍未达标的时间）
-            # 这里我们计算生存概率降到0.1的时间点
-            try:
-                # 获取生存概率和时间
-                survival_prob = kmf.survival_function_.values.flatten()
-                times = kmf.survival_function_.index
-                
-                # 找到生存概率降到0.1的时间点
-                # 注意：KM曲线是递减的，所以我们找第一个小于等于0.1的点
-                below_10pct = survival_prob <= 0.1
-                if np.any(below_10pct):
-                    idx = np.where(below_10pct)[0][0]
-                    time_10pct = times[idx]
-                    print(f"簇 {cluster_id} 10%未达标时间: {format_gestational_age(time_10pct)} (原始值: {time_10pct:.2f}天)")
-                    results[cluster_id] = {
-                        'median_time': median_time,
-                        'time_10pct': time_10pct
-                    }
-                else:
-                    print(f"簇 {cluster_id} 10%未达标时间: 超出观察范围")
-                    results[cluster_id] = {
-                        'median_time': median_time,
-                        'time_10pct': None
-                    }
-            except Exception as e:
-                print(f"簇 {cluster_id} 10%未达标时间: 计算失败 ({e})")
-                results[cluster_id] = {
-                    'median_time': median_time,
-                    'time_10pct': None
-                }
+    km_model_analyzer = KMModel()
+    results = km_model_analyzer.analyze_km_results(km_fitters, format_gestational_age)
     
     return results
 
