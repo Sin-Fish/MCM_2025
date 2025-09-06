@@ -25,5 +25,4 @@ pprint.pprint({
     '95%置信区间上限': results['ci_95%_upper']
 }, width=100, depth=2, indent=2)
 
-# 输出显著特征
-print("\n显著特征(p<0.05):", [i for i,p in enumerate(results['p_values']) if p < 0.05])
+

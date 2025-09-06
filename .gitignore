@@ -22,3 +22,4 @@ rad.json
 TestResults.xml
 # Python virtual environment
 venv/
+__pycache__
