@@ -22,7 +22,7 @@ from data.util.data_manager import Data
 from model.k_means import KMeansCluster
 from model.cox import CoxModel  
 from data.util.draw import draw_col_seaborn, draw_col_hot_map_seaborn
-
+from main.util.diagnostic_efficacy_ratio import diagnostic_efficacy_ratio
 
 def plot_cluster_data(cluster_id, data, title):
     """绘制簇数据的散点图"""

@@ -18,7 +18,7 @@ from model.k_means import KMeansCluster
 from model.km_model import KMModel
 from data.util.draw import draw_col_seaborn
 from model.logistic_regression import LogisticRegressionModel
-
+from main.util.diagnostic_efficacy_ratio import diagnostic_efficacy_ratio
 def plot_cluster_data(cluster_id, data, title):
     """绘制簇数据的散点图"""
     plt.figure(figsize=(10, 6))
