@@ -62,7 +62,7 @@ class LogisticRegressionAnalysis:
         self.std_err = None     # 系数标准误
         self.z_values = None    # z统计量
         self.p_values = None    # p值
-
+        self.threshold = 0.11
     def fit(self, X, y):
         self.model.fit(X, y)
         self.coef_ = self.model.coef_[0]
@@ -98,11 +98,15 @@ class LogisticRegressionAnalysis:
         """预测每个样本为0和1的概率"""
         return self.model.predict_proba(X)
 
-    def predict(self, X, threshold=0.11):
+    def predict(self, X, threshold=None):
+        if threshold is None:
+            threshold = self.threshold
         """根据阈值预测类别"""
         proba = self.model.predict_proba(X)[:, 1]
         return (proba >= threshold).astype(int)
-    def evaluate(self, X, y, threshold=0.11):
+    def evaluate(self, X, y, threshold=None):
+        if threshold is None:
+            threshold = self.threshold
         y_pred = self.predict(X, threshold)
         proba = self.predict_proba(X)[:, 1]
         acc = accuracy_score(y, y_pred)
