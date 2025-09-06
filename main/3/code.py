@@ -5,12 +5,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# 聚类数量配置
+N_CLUSTERS = 5
+
 check_time = '检测孕周'
 
 # 定义聚类特征和Cox计算特征，方便调整
 CLUSTER_FEATURES = ['孕妇BMI']
 COX_FEATURE_COLUMNS = ['年龄', '检测抽血次数', '检测孕周', '原始读段数', 
-                      '在参考基因组上比对的比例', 'Y染色体的Z值']
+                      '在参考基因组上比对的比例']
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
@@ -83,7 +86,6 @@ def prepare_pregnancy_data_for_cox(data):
                 '检测孕周': group.iloc[0]['检测孕周'],
                 '原始读段数': group.iloc[0]['原始读段数'] if '原始读段数' in group.columns else np.nan,
                 '在参考基因组上比对的比例': group.iloc[0]['在参考基因组上比对的比例'] if '在参考基因组上比对的比例' in group.columns else np.nan,
-                'Y染色体的Z值': group.iloc[0]['Y染色体的Z值'] if 'Y染色体的Z值' in group.columns else np.nan,
                 'Y染色体浓度': group.iloc[0]['Y染色体浓度'],  # 添加Y染色体浓度用于聚类
                 '孕妇BMI': group.iloc[0]['孕妇BMI'] if '孕妇BMI' in group.columns else np.nan  # 添加孕妇BMI用于聚类
             })
@@ -100,7 +102,6 @@ def prepare_pregnancy_data_for_cox(data):
                     '检测孕周': group.iloc[0]['检测孕周'],
                     '原始读段数': group.iloc[0]['原始读段数'] if '原始读段数' in group.columns else np.nan,
                     '在参考基因组上比对的比例': group.iloc[0]['在参考基因组上比对的比例'] if '在参考基因组上比对的比例' in group.columns else np.nan,
-                'Y染色体的Z值': group.iloc[0]['Y染色体的Z값'] if 'Y染色体的Z값' in group.columns else np.nan,
                     'Y染色体浓度': group.iloc[0]['Y染色体浓度'],  # 添加Y染色体浓度用于聚类
                     '孕妇BMI': group.iloc[0]['孕妇BMI'] if '孕妇BMI' in group.columns else np.nan  # 添加孕妇BMI用于聚类
                 })
@@ -539,7 +540,7 @@ def main_analysis_pipeline(data):
     print("开始执行主分析流程...")
     
     # 执行K-means聚类分析
-    kmeans_model, X, feature = perform_kmeans_analysis(data, n_clusters=4)
+    kmeans_model, X, feature = perform_kmeans_analysis(data, n_clusters=N_CLUSTERS)
     
     # 执行Cox比例风险模型分析
     cox_results = perform_cox_analysis(data, kmeans_model, feature)

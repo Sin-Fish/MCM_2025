@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+# 聚类数量配置
+N_CLUSTERS = 5
 
 check_time = '检测孕周'
 
@@ -235,7 +237,7 @@ def main_analysis_pipeline(data):
     print("开始执行主分析流程...")
     
     # 执行K-means聚类分析
-    kmeans_model, X, feature = perform_kmeans_analysis(data, n_clusters=4)
+    kmeans_model, X, feature = perform_kmeans_analysis(data, n_clusters=N_CLUSTERS)
     
     # 执行KM生存分析
     km_results = perform_km_analysis(data, kmeans_model, feature)
