@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.ticker as ticker
 
 # 聚类数量配置
 N_CLUSTERS = 4
@@ -375,6 +376,7 @@ def perform_cox_analysis(data, kmeans_model, feature):
     # 为每个簇拟合Cox模型
     cox_models = {}
     survival_functions = {}
+    best_times = {}  # 存储每个簇的最佳诊断效率比时间点
     
     # 创建用于绘制生存曲线的图表
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -459,27 +461,61 @@ def perform_cox_analysis(data, kmeans_model, feature):
                         plot_probs = np.array([1.0])
                     
                     # 绘制曲线
-                    ax.plot(plot_times, plot_probs, label=f'簇 {cluster_id}')
+                    line = ax.plot(plot_times, plot_probs, label=f'簇 {cluster_id}')
+                    
+                    # 计算并存储最佳诊断效率比时间点
+                    median_time, max_diagnostic_ratio_time = estimate_survival_times(
+                        survival_function, format_gestational_age
+                    )
+                    best_times[cluster_id] = max_diagnostic_ratio_time
+                    
                 except Exception as e:
                     print(f"绘制簇 {cluster_id} 的生存曲线时出错: {e}")
                     
             except Exception as e:
                 print(f"簇 {cluster_id} 的Cox模型拟合失败: {e}")
     
+    # 在图表上标记最佳诊断效率比时间点
+    colors = plt.cm.get_cmap('tab10', kmeans_model.n_clusters)
+    for cluster_id, best_time in best_times.items():
+        if best_time is not None and cluster_id in survival_functions:
+            # 获取该时间点的生存概率
+            survival_prob = np.interp(best_time, 
+                                    survival_functions[cluster_id].index, 
+                                    survival_functions[cluster_id].iloc[:, 0])
+            # 绘制点标记，Y轴是生存概率，直接使用计算得到的生存概率值
+            ax.plot(best_time, survival_prob, 'o', color=colors(cluster_id), 
+                   markersize=8, markeredgecolor='black', markeredgewidth=1,
+                   label=f'簇 {cluster_id} 最佳时间点')
+    
     # 设置统一的时间轴范围从0到200天
     ax.set_xlim(min_time, max_time)
     # 设置y轴范围从-0.05到1.05，与main/2/code.py保持一致，稍微超出0-1范围以提供更好的可视化效果
     ax.set_ylim(-0.05, 1.05)
     
-    # 添加10%的参考线（与KM分析保持一致）
+    # 添加50%的参考线（中位生存时间参考线）
     ax.axhline(y=0.5, color='red', linestyle='--', alpha=0.7, label='生存概率中位线')
     
     # 添加图表标签和图例
     ax.set_xlabel(check_time)  # 使用check_time变量作为x轴标签
     ax.set_ylabel('生存概率')
     ax.set_title('各簇的Cox模型生存函数')
-    ax.legend()
+    
+    # 优化图例显示
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    ax.legend(by_label.values(), by_label.keys())
+    
     ax.grid(True, alpha=0.3)
+    
+    # 设置x轴刻度间隔为7天
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(7))
+    ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
+    
+    # 设置更好的y轴刻度
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
+    ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.05))
+    
     plt.tight_layout()
     plt.show()
     

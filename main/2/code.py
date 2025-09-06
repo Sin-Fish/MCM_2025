@@ -291,6 +291,7 @@ def perform_km_analysis(data, kmeans_model, feature):
     # 为每个簇拟合KM曲线
     km_models = {}
     km_fitters = {}  # 用于兼容旧的分析方法
+    best_times = {}  # 存储每个簇的最佳诊断效率比时间点
     
     for cluster_id in range(kmeans_model.n_clusters):
         cluster_data = km_data_clean[km_data_clean['cluster'] == cluster_id]
@@ -310,8 +311,27 @@ def perform_km_analysis(data, kmeans_model, feature):
             
             # 绘制曲线
             km_models[cluster_id].plot(ax=ax, ci_show=False)
+            
+            # 计算并存储最佳诊断效率比时间点
+            median_time, max_diagnostic_ratio_time = estimate_survival_times(
+                km_fitters[cluster_id].survival_function_, format_gestational_age
+            )
+            best_times[cluster_id] = max_diagnostic_ratio_time
     
-    # 添加10%的参考线
+    # 在图表上标记最佳诊断效率比时间点
+    colors = plt.cm.get_cmap('tab10', kmeans_model.n_clusters)
+    for cluster_id, best_time in best_times.items():
+        if best_time is not None:
+            # 获取该时间点的生存概率（未达标概率 = 1 - 生存概率）
+            survival_prob = np.interp(best_time, 
+                                    km_fitters[cluster_id].survival_function_.index, 
+                                    km_fitters[cluster_id].survival_function_.iloc[:, 0])
+            # 绘制点标记，注意Y轴是未达标概率，所以需要使用 (1 - 生存概率)
+            ax.plot(best_time,  survival_prob, 'o', color=colors(cluster_id), 
+                   markersize=8, markeredgecolor='black', markeredgewidth=1,
+                   label=f'簇 {cluster_id} 最佳时间点')
+    
+    # 添加50%的参考线（中位生存时间参考线）
     ax.axhline(y=0.5, color='red', linestyle='--', alpha=0.7, label='生存概率中位线')
     
     ax.set_xlabel(check_time)
