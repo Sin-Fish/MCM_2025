@@ -313,7 +313,7 @@ if __name__ == "__main__":
     project_dir = os.path.dirname(os.path.dirname(script_dir))
     config = {
         "file_path": os.path.join(project_dir, "data", "男胎检测数据.xlsx"),  
-        "save_path": os.path.join(project_dir, "data", "date_cleaned_data_male.xlsx"),  # 改为CSV格式
+        "save_path": os.path.join(project_dir, "data", "date_cleaned_data_male.xlsx"),  
     }
 
     # 创建数据清洗器实例
