@@ -1,0 +1,154 @@
+{
+  "y_0.05": {
+    "stats": {
+      "90": {
+        "mean": 146.37625,
+        "std": 2.24130479576072
+      }
+    },
+    "n_valid_simulations": 500,
+    "comparison": {
+      "90": {
+        "baseline_value": 146.02499999999998,
+        "baseline_formatted": "20周+6天",
+        "simulation_mean": 146.37625,
+        "simulation_formatted": "20周+6天",
+        "difference": 0.3512500000000216,
+        "coefficient_of_variation": 0.015311942994582248
+      }
+    }
+  },
+  "y_0.1": {
+    "stats": {
+      "90": {
+        "mean": 148.06529999999998,
+        "std": 2.7220885198685214
+      }
+    },
+    "n_valid_simulations": 500,
+    "comparison": {
+      "90": {
+        "baseline_value": 146.02499999999998,
+        "baseline_formatted": "20周+6天",
+        "simulation_mean": 148.06529999999998,
+        "simulation_formatted": "21周+1天",
+        "difference": 2.040300000000002,
+        "coefficient_of_variation": 0.01838437851318656
+      }
+    }
+  },
+  "time_2.0": {
+    "stats": {
+      "90": {
+        "mean": 147.7644001322937,
+        "std": 0.6854269427294946
+      }
+    },
+    "n_valid_simulations": 500,
+    "comparison": {
+      "90": {
+        "baseline_value": 146.02499999999998,
+        "baseline_formatted": "20周+6天",
+        "simulation_mean": 147.7644001322937,
+        "simulation_formatted": "21周",
+        "difference": 1.7394001322937243,
+        "coefficient_of_variation": 0.004638647347506102
+      }
+    }
+  },
+  "time_5.0": {
+    "stats": {
+      "90": {
+        "mean": 147.64772315534665,
+        "std": 1.4442830673123408
+      }
+    },
+    "n_valid_simulations": 500,
+    "comparison": {
+      "90": {
+        "baseline_value": 146.02499999999998,
+        "baseline_formatted": "20周+6天",
+        "simulation_mean": 147.64772315534665,
+        "simulation_formatted": "21周",
+        "difference": 1.6227231553466765,
+        "coefficient_of_variation": 0.009781952856751791
+      }
+    }
+  },
+  "y_0.05_time_2.0": {
+    "stats": {
+      "90": {
+        "mean": 146.404845602364,
+        "std": 2.3537768422954928
+      }
+    },
+    "n_valid_simulations": 500,
+    "comparison": {
+      "90": {
+        "baseline_value": 146.02499999999998,
+        "baseline_formatted": "20周+6天",
+        "simulation_mean": 146.404845602364,
+        "simulation_formatted": "20周+6天",
+        "difference": 0.3798456023640142,
+        "coefficient_of_variation": 0.016077178542903955
+      }
+    }
+  },
+  "y_0.05_time_5.0": {
+    "stats": {
+      "90": {
+        "mean": 146.8465673675809,
+        "std": 2.755523613106419
+      }
+    },
+    "n_valid_simulations": 500,
+    "comparison": {
+      "90": {
+        "baseline_value": 146.02499999999998,
+        "baseline_formatted": "20周+6天",
+        "simulation_mean": 146.8465673675809,
+        "simulation_formatted": "20周+6天",
+        "difference": 0.8215673675809114,
+        "coefficient_of_variation": 0.018764644366584985
+      }
+    }
+  },
+  "y_0.1_time_2.0": {
+    "stats": {
+      "90": {
+        "mean": 148.1463748493756,
+        "std": 2.682868706452257
+      }
+    },
+    "n_valid_simulations": 500,
+    "comparison": {
+      "90": {
+        "baseline_value": 146.02499999999998,
+        "baseline_formatted": "20周+6天",
+        "simulation_mean": 148.1463748493756,
+        "simulation_formatted": "21周+1天",
+        "difference": 2.121374849375627,
+        "coefficient_of_variation": 0.01810958053600705
+      }
+    }
+  },
+  "y_0.1_time_5.0": {
+    "stats": {
+      "90": {
+        "mean": 148.92616792313945,
+        "std": 3.084436825666721
+      }
+    },
+    "n_valid_simulations": 500,
+    "comparison": {
+      "90": {
+        "baseline_value": 146.02499999999998,
+        "baseline_formatted": "20周+6天",
+        "simulation_mean": 148.92616792313945,
+        "simulation_formatted": "21周+1天",
+        "difference": 2.901167923139468,
+        "coefficient_of_variation": 0.02071118104145803
+      }
+    }
+  }
+}

@@ -5,10 +5,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from lifelines import KaplanMeierFitter
 
-
+# 定义检查时间特征名称
 check_time = '检测孕周'
 
-
+# 修复路径问题 - 使用相对路径添加项目根目录
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 
@@ -91,36 +91,51 @@ def prepare_pregnancy_data_for_km(data):
     
     return pd.DataFrame(results)
 
-if __name__ == "__main__":
-    data = Data.data
-    # 统计每个孕妇达标孕周，
-    # feature = [check_time, '孕妇BMI']
-    feature = ['孕妇BMI', "Y染色体浓度"]
+def perform_kmeans_analysis(data, n_clusters=4):
+    """
+    执行K-means聚类分析
     
+    参数:
+    data: 原始数据
+    n_clusters: 聚类数量
+    
+    返回:
+    kmeans模型和聚类结果
+    """
+    # 特征选择
+    feature = ['孕妇BMI', "Y染色体浓度"]
     X = data[feature].dropna()
     
-    kmeans = KMeansCluster(n_clusters=4)
+    # 训练K-means模型
+    kmeans = KMeansCluster(n_clusters=n_clusters)
     kmeans.train(X)
     
+    # 输出聚类信息
     print("聚类中心:")
     print(kmeans.get_cluster_centers())
     print("惯性 (簇内平方和):", kmeans.get_inertia())
     print("前10个样本的聚类标签:", kmeans.get_labels()[:10])
     
+    # 输出边界信息
     if len(feature) == 2:
         kmeans.print_cluster_boundaries(X, feature[0], feature[1])
     elif len(feature) == 1:
         kmeans.print_cluster_boundaries(X, feature[0])
     
-    sample_data = X[:5]
-    predictions = kmeans.predict(sample_data)
-    print("\n示例数据的聚类预测:", predictions)
-    
-    if len(feature) == 2:
-        kmeans.plot_clusters(X, feature[0], feature[1])
-    elif len(feature) == 1:
-        kmeans.plot_clusters(X, feature[0])
+    return kmeans, X, feature
 
+def perform_km_analysis(data, kmeans_model, feature):
+    """
+    执行Kaplan-Meier生存分析
+    
+    参数:
+    data: 原始数据
+    kmeans_model: 训练好的K-means模型
+    feature: 用于聚类的特征列表
+    
+    返回:
+    KM分析结果
+    """
     # 准备用于Kaplan-Meier分析的数据
     km_data = prepare_pregnancy_data_for_km(data)
     
@@ -129,11 +144,11 @@ if __name__ == "__main__":
     km_data_clean = km_data.loc[km_X.index].copy()
     
     # 对数据进行聚类预测
-    km_clusters = kmeans.predict(km_X)
+    km_clusters = kmeans_model.predict(km_X)
     km_data_clean['cluster'] = km_clusters
     
     print("\n=== 根据聚类结果分类的数据统计 ===")
-    for i in range(kmeans.n_clusters):
+    for i in range(kmeans_model.n_clusters):
         cluster_count = len(km_data_clean[km_data_clean['cluster'] == i])
         print(f"簇 {i}: {cluster_count} 个孕妇")
     
@@ -142,7 +157,7 @@ if __name__ == "__main__":
     
     # 为每个簇绘制KM曲线
     km_fitters = {}
-    for cluster_id in range(kmeans.n_clusters):
+    for cluster_id in range(kmeans_model.n_clusters):
         cluster_data = km_data_clean[km_data_clean['cluster'] == cluster_id]
         if len(cluster_data) > 0:
             # 创建KaplanMeierFitter实例
@@ -168,7 +183,8 @@ if __name__ == "__main__":
     
     # 计算各簇的中位生存时间和90%分位数时间
     print("\n=== 各簇Kaplan-Meier分析结果 ===")
-    for cluster_id in range(kmeans.n_clusters):
+    results = {}
+    for cluster_id in range(kmeans_model.n_clusters):
         if cluster_id in km_fitters:
             kmf = km_fitters[cluster_id]
             median_time = kmf.median_survival_time_
@@ -191,7 +207,51 @@ if __name__ == "__main__":
                     idx = np.where(below_10pct)[0][0]
                     time_10pct = times[idx]
                     print(f"簇 {cluster_id} 10%未达标时间: {format_gestational_age(time_10pct)} (原始值: {time_10pct:.2f}天)")
+                    results[cluster_id] = {
+                        'median_time': median_time,
+                        'time_10pct': time_10pct
+                    }
                 else:
                     print(f"簇 {cluster_id} 10%未达标时间: 超出观察范围")
+                    results[cluster_id] = {
+                        'median_time': median_time,
+                        'time_10pct': None
+                    }
             except Exception as e:
                 print(f"簇 {cluster_id} 10%未达标时间: 计算失败 ({e})")
+                results[cluster_id] = {
+                    'median_time': median_time,
+                    'time_10pct': None
+                }
+    
+    return results
+
+def main_analysis_pipeline(data):
+    """
+    主分析流程函数，整合聚类分析和KM分析
+    
+    参数:
+    data: 原始数据
+    
+    返回:
+    分析结果
+    """
+    print("开始执行主分析流程...")
+    
+    # 执行K-means聚类分析
+    kmeans_model, X, feature = perform_kmeans_analysis(data, n_clusters=4)
+    
+    # 执行KM生存分析
+    km_results = perform_km_analysis(data, kmeans_model, feature)
+    
+    print("\n主分析流程执行完成。")
+    return {
+        'kmeans_model': kmeans_model,
+        'km_results': km_results
+    }
+
+if __name__ == "__main__":
+    data = Data.data
+    
+    # 执行主分析流程
+    analysis_results = main_analysis_pipeline(data)
