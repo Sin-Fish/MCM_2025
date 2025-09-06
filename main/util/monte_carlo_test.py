@@ -4,14 +4,20 @@ from scipy import stats
 import sys
 import os
 import json
+import matplotlib.pyplot as plt
 from datetime import datetime
 
 # 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 
+# 导入中文字体设置方法
+from data.util.draw import set_chinese_font
 from data.util.data_manager import Data
 from model.k_means import KMeansCluster
+
+# 设置中文字体
+set_chinese_font()
 
 
 def add_noise_to_data(data, sigma=0.1):
@@ -193,6 +199,7 @@ def monte_carlo_simulation(original_data, n_simulations=100, sigma_y=0.1, sigma_
             }
         
         return {
+            'percentile_times': percentile_times,
             'stats': stats_results,
             'n_valid_simulations': len(percentile_times[percentiles[0]])
         }
@@ -347,6 +354,111 @@ def compare_with_baseline(original_data, simulation_results, percentiles=[50, 90
     return comparison_results
 
 
+def visualize_simulation_results(simulation_results, sigma_y, sigma_time, percentiles=[50, 90]):
+    """
+    可视化模拟结果的分布图，直观查看变异程度
+    
+    参数:
+    simulation_results: 模拟结果
+    sigma_y: Y染色体浓度噪声标准差
+    sigma_time: 检测时间噪声标准差
+    percentiles: 分位数列表
+    """
+    if 'percentile_times' not in simulation_results:
+        print("无法可视化模拟结果分布：缺少详细时间数据")
+        return
+    
+    # 创建图形
+    fig, axes = plt.subplots(len(percentiles), 1, figsize=(10, 4*len(percentiles)))
+    if len(percentiles) == 1:
+        axes = [axes]
+    
+    for i, p in enumerate(percentiles):
+        if p in simulation_results['percentile_times']:
+            times = simulation_results['percentile_times'][p]
+            
+            # 绘制直方图
+            axes[i].hist(times, bins=20, alpha=0.7, color='skyblue', edgecolor='black')
+            axes[i].set_xlabel('时间 (天)')
+            axes[i].set_ylabel('频次')
+            axes[i].set_title(f'{p}%分位时间分布 (σ_y={sigma_y}, σ_time={sigma_time})')
+            axes[i].grid(True, alpha=0.3)
+            
+            # 添加均值线
+            mean_time = np.mean(times)
+            axes[i].axvline(mean_time, color='red', linestyle='--', linewidth=2, 
+                           label=f'均值: {format_gestational_age(mean_time)} ({mean_time:.2f}天)')
+            axes[i].legend()
+    
+    plt.tight_layout()
+    plt.show()
+
+
+def sensitivity_analysis(results_dict, percentiles=[50, 90]):
+    """
+    通过敏感性分析确认哪些参数对输出影响最大
+    
+    参数:
+    results_dict: 不同参数设置下的结果字典
+    percentiles: 分位数列表
+    """
+    # 提取不同参数下的结果
+    y_only_results = {}  # 只有Y浓度噪声的结果
+    time_only_results = {}  # 只有时间噪声的结果
+    combined_results = {}  # 组合噪声的结果
+    
+    for key, result in results_dict.items():
+        if key.startswith('y_') and '_time_' not in key:
+            sigma_y = float(key.split('_')[1])
+            y_only_results[sigma_y] = result
+        elif key.startswith('time_'):
+            sigma_time = float(key.split('_')[1])
+            time_only_results[sigma_time] = result
+        elif '_time_' in key:
+            parts = key.split('_')
+            sigma_y = float(parts[1])
+            sigma_time = float(parts[3])
+            combined_results[(sigma_y, sigma_time)] = result
+    
+    # 分析每个分位数
+    for p in percentiles:
+        print(f"\n=== {p}%分位数敏感性分析 ===")
+        
+        # 分析Y浓度噪声的影响
+        if y_only_results:
+            print("\nY染色体浓度噪声影响:")
+            y_sigmas = sorted(y_only_results.keys())
+            y_means = []
+            for sigma in y_sigmas:
+                if p in y_only_results[sigma]['stats']:
+                    y_means.append(y_only_results[sigma]['stats'][p]['mean'])
+            
+            if y_means:
+                print("σ_y\t均值\t\t变异")
+                print("-" * 30)
+                baseline_mean = y_means[0]  # 以最小噪声为基准
+                for i, sigma in enumerate(y_sigmas):
+                    diff = y_means[i] - baseline_mean
+                    print(f"{sigma}\t{format_gestational_age(y_means[i])} ({y_means[i]:.2f})\t{diff:.2f}")
+        
+        # 分析时间噪声的影响
+        if time_only_results:
+            print("\n检测时间噪声影响:")
+            time_sigmas = sorted(time_only_results.keys())
+            time_means = []
+            for sigma in time_sigmas:
+                if p in time_only_results[sigma]['stats']:
+                    time_means.append(time_only_results[sigma]['stats'][p]['mean'])
+            
+            if time_means:
+                print("σ_time\t均值\t\t变异")
+                print("-" * 30)
+                baseline_mean = time_means[0]  # 以最小噪声为基准
+                for i, sigma in enumerate(time_sigmas):
+                    diff = time_means[i] - baseline_mean
+                    print(f"{sigma}\t{format_gestational_age(time_means[i])} ({time_means[i]:.2f})\t{diff:.2f}")
+
+
 def save_results_to_json(results, filename=None):
     """
     将结果保存到JSON文件
@@ -387,7 +499,8 @@ def save_results_to_json(results, filename=None):
 
 
 def run_sensitivity_analysis(original_data, sigma_y_values=[0.05, 0.1], sigma_time_values=[2.0, 5.0], 
-                            n_simulations=100, check_time='检测孕周', percentiles=[50, 90]):
+                            n_simulations=100, check_time='检测孕周', percentiles=[50, 90], 
+                            visualize=False):
     """
     运行敏感性分析，测试不同噪声水平下的结果稳定性
     
@@ -398,6 +511,7 @@ def run_sensitivity_analysis(original_data, sigma_y_values=[0.05, 0.1], sigma_ti
     n_simulations: 每种情况下的模拟次数
     check_time: 检查时间列名
     percentiles: 要分析的分位数列表
+    visualize: 是否显示可视化结果
     
     返回:
     不同sigma值下的分析结果
@@ -416,6 +530,10 @@ def run_sensitivity_analysis(original_data, sigma_y_values=[0.05, 0.1], sigma_ti
             # 与基准数据比较
             comparison = compare_with_baseline(original_data, result, percentiles, check_time)
             result['comparison'] = comparison
+            
+            # 可视化结果
+            # if visualize:
+            #     visualize_simulation_results(result, sigma_y, 0, percentiles)
     
     # 测试不同的时间噪声水平（Y浓度噪声为0）
     print("\n--- 测试检测时间噪声对结果的影响 (Y浓度噪声σ_y=0) ---")
@@ -427,6 +545,10 @@ def run_sensitivity_analysis(original_data, sigma_y_values=[0.05, 0.1], sigma_ti
             # 与基准数据比较
             comparison = compare_with_baseline(original_data, result, percentiles, check_time)
             result['comparison'] = comparison
+            
+            # # 可视化结果
+            # if visualize:
+            #     visualize_simulation_results(result, 0, sigma_time, percentiles)
     
     # 测试同时存在两种噪声的情况
     print("\n--- 测试同时存在两种噪声的情况 ---")
@@ -439,9 +561,21 @@ def run_sensitivity_analysis(original_data, sigma_y_values=[0.05, 0.1], sigma_ti
                 # 与基准数据比较
                 comparison = compare_with_baseline(original_data, result, percentiles, check_time)
                 result['comparison'] = comparison
+                
+                # 可视化结果
+                if visualize and sigma_y == sigma_y_values[len(sigma_y_values)-1] and sigma_time == sigma_time_values[len(sigma_time_values)-1]:
+                    visualize_simulation_results(result, sigma_y, sigma_time, percentiles)
     
-    # 保存结果到JSON文件
-    save_results_to_json(results)
+    # 执行敏感性分析
+    sensitivity_analysis(results, percentiles)
+    
+    # 保存结果到JSON文件（只保存比较结果）
+    comparison_only_results = {}
+    for key, result in results.items():
+        if 'comparison' in result:
+            comparison_only_results[key] = result['comparison']
+    
+    save_results_to_json(comparison_only_results)
     
     return results
 
@@ -456,7 +590,8 @@ if __name__ == "__main__":
         sigma_y_values=[0.05, 0.1], 
         sigma_time_values=[2.0, 5.0],  # 时间噪声使用较大的值，因为时间是以天为单位的
         n_simulations=500,
-        percentiles=[90]  # 可以修改为其他分位数，如 [25, 50, 75, 90]
+        percentiles=[90],  # 可以修改为其他分位数，如 [25, 50, 75, 90]
+        visualize=True  # 显示可视化结果
     )
     
     print("\n敏感性分析完成。")
