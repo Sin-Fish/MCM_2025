@@ -7,15 +7,15 @@ import seaborn as sns
 
 check_time = '检测孕周'
 
-# 修复路径问题 - 使用相对路径添加项目根目录
+
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 
 from data.util.data_manager import Data
 from model.k_means import KMeansCluster
-from model.cox import CoxModel  # 将KM模型替换为Cox模型
-from data.util.draw import draw_col_seaborn
-from model.logistic_regression import LogisticRegressionModel
+from model.cox import CoxModel  
+from data.util.draw import draw_col_seaborn, draw_col_hot_map_seaborn
+
 
 def plot_cluster_data(cluster_id, data, title):
     """绘制簇数据的散点图"""
@@ -281,7 +281,7 @@ def analyze_cox_results(cox_models, format_func, survival_functions):
                 'median_time': None,
                 'ten_percent_time': None
             }
-            
+     
     return results
 
 def perform_cox_analysis(data, kmeans_model, feature):
@@ -441,7 +441,54 @@ def perform_cox_analysis(data, kmeans_model, feature):
     
     # 分析Cox模型结果
     print("\n=== 各簇Cox模型分析结果 ===")
-    analyze_cox_results(cox_models, format_gestational_age, survival_functions)
+    cox_results = analyze_cox_results(cox_models, format_gestational_age, survival_functions)
+    
+    # 统一输出各簇的中位生存时间和10%未达标时间，方便比对
+    print("\n=== 统一输出各簇预测时间 ===")
+    for cluster_id in sorted(cox_results.keys()):
+        result = cox_results[cluster_id]
+        median_time = result['median_time']
+        ten_percent_time = result['ten_percent_time']
+        
+        if median_time is not None:
+            print(f"簇 {cluster_id} 中位生存时间: {format_gestational_age(median_time)} (原始值: {median_time:.2f}天)")
+        else:
+            print(f"簇 {cluster_id} 中位生存时间: 无法估算")
+            
+        if ten_percent_time is not None:
+            print(f"簇 {cluster_id} 10%未达标时间: {format_gestational_age(ten_percent_time)} (原始值: {ten_percent_time:.2f}天)")
+        else:
+            print(f"簇 {cluster_id} 10%未达标时间: 无法估算")
+    
+    # 统一输出协变量影响数据
+    print("\n=== 统一输出协变量影响数据 ===")
+    # 收集所有模型的系数
+    coefficients_data = {}
+    for cluster_id, model in cox_models.items():
+        if hasattr(model, 'get_coefficients'):
+            try:
+                coeffs = model.get_coefficients()
+                coefficients_data[cluster_id] = coeffs
+            except:
+                continue
+    
+    if coefficients_data:
+        # 构建系数矩阵
+        all_features = set()
+        for coeffs in coefficients_data.values():
+            all_features.update(coeffs.index)
+        
+        all_features = sorted(list(all_features))
+        
+        # 创建系数矩阵并打印
+        coef_matrix = pd.DataFrame(index=all_features)
+        for cluster_id, coeffs in coefficients_data.items():
+            coef_matrix[f'簇 {cluster_id}'] = coeffs.reindex(all_features, fill_value=0)
+        
+        # 打印系数矩阵
+        print(coef_matrix.to_string(float_format='%.3f'))
+    else:
+        print("没有可用的协变量影响数据")
     
     return cox_models
 
