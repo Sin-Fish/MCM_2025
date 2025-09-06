@@ -56,7 +56,8 @@ class LinearRegressionAnalysis:
 class LogisticRegressionAnalysis:
     def __init__(self):
         """初始化逻辑回归分析模型"""
-        self.model = LogisticRegression()
+        self.class_weight={0:1,1:1}
+        self.model = LogisticRegression(class_weight=self.class_weight, random_state=42, max_iter=1000)
         self.coef_ = None       # 回归系数
         self.intercept_ = None  # 截距项
         self.std_err = None     # 系数标准误
