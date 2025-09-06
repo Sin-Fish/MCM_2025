@@ -94,7 +94,14 @@ class LogisticRegressionAnalysis:
             f'ci_{int((1-alpha)*100)}%_lower': ci_lower,
             f'ci_{int((1-alpha)*100)}%_upper': ci_upper
         }
+    def predict_proba(self, X):
+        """预测每个样本为0和1的概率"""
+        return self.model.predict_proba(X)
 
+    def predict(self, X, threshold=0.5):
+        """根据阈值预测类别"""
+        proba = self.model.predict_proba(X)[:, 1]
+        return (proba >= threshold).astype(int)
 
         
 
