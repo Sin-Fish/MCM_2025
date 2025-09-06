@@ -58,6 +58,37 @@ class KMeansCluster:
         '''
         return self.model.inertia_
 
+    def remap_labels_by_first_feature(self):
+        '''重新映射聚类标签，使标签按聚类中心第一个特征值递增排序
+        '''
+        if self.cluster_centers_ is None:
+            raise ValueError("模型尚未训练，请先调用train方法")
+            
+        # 获取聚类中心
+        centers = self.get_cluster_centers()
+        
+        # 根据第一个特征对标签进行排序
+        sorted_indices = np.argsort(centers[:, 0])
+        
+        # 创建标签映射
+        label_mapping = {old_label: new_label for new_label, old_label in enumerate(sorted_indices)}
+        
+        # 重新映射训练数据的标签
+        remapped_labels = np.array([label_mapping[label] for label in self.get_labels()])
+        self.labels_ = remapped_labels
+        
+        # 重新映射聚类中心顺序
+        remapped_centers = centers[sorted_indices]
+        self.cluster_centers_ = remapped_centers
+        
+        # 更新模型的预测方法，使其使用新的标签映射
+        original_predict = self.model.predict
+        def remapped_predict(X):
+            original_labels = original_predict(X)
+            return np.array([label_mapping[label] for label in original_labels])
+        
+        self.model.predict = remapped_predict
+
     def print_cluster_boundaries(self, X, x_col_name=None, y_col_name=None):
         '''输出每类的边界数据，帮助确定区间
         Args:
@@ -175,6 +206,59 @@ class KMeansCluster:
         # 解决负号显示问题
         plt.rcParams['axes.unicode_minus'] = False
 
+def find_optimal_clusters(X, max_clusters=10, random_state=42):
+    '''使用肘部法则确定最佳聚类数
+    Args:
+        X: 特征矩阵 (n_samples, n_features)
+        max_clusters: 最大聚类数
+        random_state: 随机种子
+    Returns:
+        inertia_values: 每个聚类数对应的惯性值列表
+    '''
+    inertia_values = []
+    K_range = range(1, max_clusters + 1)
+    
+    for k in K_range:
+        kmeans = KMeans(n_clusters=k, random_state=random_state, n_init=10)
+        kmeans.fit(X)
+        inertia_values.append(kmeans.inertia_)
+    
+    return list(K_range), inertia_values
+
+def plot_elbow_method(X, max_clusters=10, random_state=42):
+    '''绘制肘部法则图
+    Args:
+        X: 特征矩阵 (n_samples, n_features)
+        max_clusters: 最大聚类数
+        random_state: 随机种子
+    '''
+    # 设置中文字体支持
+    plt.rcParams['axes.unicode_minus'] = False
+    font_names = ['SimHei', 'Microsoft YaHei', 'STHeiti', 'FangSong']
+    available_fonts = [f.name for f in fm.fontManager.ttflist]
+    for font_name in font_names:
+        if font_name in available_fonts:
+            plt.rcParams['font.sans-serif'] = [font_name]
+            break
+    
+    K_range, inertia_values = find_optimal_clusters(X, max_clusters, random_state)
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(K_range, inertia_values, 'bo-')
+    plt.xlabel('聚类数 (k)')
+    plt.ylabel('簇内平方和 (惯性值)')
+    plt.title('肘部法则确定最佳聚类数')
+    plt.grid(True, alpha=0.3)
+    
+    # 标注每个点的值
+    for i, (k, inertia) in enumerate(zip(K_range, inertia_values)):
+        plt.annotate(f'{inertia:.0f}', (k, inertia), textcoords="offset points", 
+                    xytext=(0,10), ha='center')
+    
+    plt.show()
+    
+    return K_range, inertia_values
+
 if __name__ == "__main__":
     data = Data.data
     # 选择用于聚类的特征
@@ -184,8 +268,12 @@ if __name__ == "__main__":
     X = data[feature].dropna()
     
     # 创建并训练K-means模型
-    kmeans = KMeansCluster(n_clusters=4)
+    kmeans = KMeansCluster(n_clusters=3)
     kmeans.train(X)
+    
+    plot_elbow_method(X, max_clusters=10)
+    # 重新映射标签，使其按照第一个特征值排序
+    kmeans.remap_labels_by_first_feature()
     
     # 输出结果
     print("聚类中心:")
