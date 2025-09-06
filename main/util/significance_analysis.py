@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import stats
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression
 from data.util.data_manager import Data
 class LinearRegressionAnalysis:
     def __init__(self):
@@ -53,14 +53,48 @@ class LinearRegressionAnalysis:
             f'ci_{int((1-alpha)*100)}%_upper': ci_upper
         }
 
-# 使用示例
-if __name__ == "__main__":
-    model = LinearRegressionAnalysis()
-    data = Data.data
-    X_train = data[['检测孕周', '孕妇BMI']]
-    y_train = data['Y染色体浓度']
-    model.fit(X_train, y_train)
-    results = model.calculate_significance()
-    print("显著特征:", [i for i,p in enumerate(results['p_values']) if p < 0.05])
+class LogisticRegressionAnalysis:
+    def __init__(self):
+        """初始化逻辑回归分析模型"""
+        self.model = LogisticRegression()
+        self.coef_ = None       # 回归系数
+        self.intercept_ = None  # 截距项
+        self.std_err = None     # 系数标准误
+        self.z_values = None    # z统计量
+        self.p_values = None    # p值
+
+    def fit(self, X, y):
+        self.model.fit(X, y)
+        self.coef_ = self.model.coef_[0]
+        self.intercept_ = self.model.intercept_[0]
+
+        # 计算标准误差（使用Hessian矩阵）
+        pred_probs = self.model.predict_proba(X)[:, 1]
+        X_with_intercept = np.hstack([np.ones((X.shape[0], 1)), X])
+        W = np.diag(pred_probs * (1 - pred_probs))
+        hessian = X_with_intercept.T @ W @ X_with_intercept
+        cov_matrix = np.linalg.inv(hessian)
+        self.std_err = np.sqrt(np.diag(cov_matrix))[1:]  # 排除截距项
+
+    def calculate_significance(self, alpha=0.05):
+        # 计算Wald检验统计量
+        self.z_values = self.coef_ / self.std_err
+        self.p_values = [2 * (1 - stats.norm.cdf(np.abs(z))) for z in self.z_values]
+
+        # 计算置信区间
+        z_critical = stats.norm.ppf(1 - alpha/2)
+        ci_lower = self.coef_ - z_critical * self.std_err
+        ci_upper = self.coef_ + z_critical * self.std_err
+
+        return {
+            'coefficients': self.coef_,
+            'std_error': self.std_err,
+            'z_values': self.z_values,
+            'p_values': self.p_values,
+            f'ci_{int((1-alpha)*100)}%_lower': ci_lower,
+            f'ci_{int((1-alpha)*100)}%_upper': ci_upper
+        }
+
+
         
 
