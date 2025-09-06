@@ -13,16 +13,20 @@ except ImportError:
     print("警告: 未安装 lifelines 库，Cox模型不可用。请使用 'pip install lifelines' 安装。")
 
 class CoxModel:
-    def __init__(self, alpha=0, penalizer=0):
+    def __init__(self, l1_ratio=0.0, penalizer=0.0):
         '''初始化Cox比例风险模型
         Args:
-            alpha: L1正则化参数，0表示无L1正则化
-            penalizer: L2正则化参数，0表示无L2正则化
+            l1_ratio: L1正则化参数，必须在0到1之间，0表示无L1正则化
+            penalizer: L2正则化参数，必须非负，0表示无L2正则化
         '''
         if not COX_AVAILABLE:
             raise ImportError("lifelines 库未安装，无法使用Cox模型")
             
-        self.model = CoxPHFitter(alpha=alpha, penalizer=penalizer)
+        # 确保l1_ratio参数在有效范围内
+        if not (0 <= l1_ratio <= 1):
+            raise ValueError("l1_ratio parameter must be between 0 and 1.")
+            
+        self.model = CoxPHFitter(l1_ratio=l1_ratio, penalizer=penalizer)
         self.is_trained = False
         self.feature_names = None
 
