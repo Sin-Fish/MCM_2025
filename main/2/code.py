@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 聚类数量配置
-N_CLUSTERS = 5
+N_CLUSTERS = 4
 
 check_time = '检测孕周'
 
@@ -19,6 +19,106 @@ from model.km_model import KMModel
 from data.util.draw import draw_col_seaborn
 from model.logistic_regression import LogisticRegressionModel
 from main.util.diagnostic_efficacy_ratio import diagnostic_efficacy_ratio
+
+
+def estimate_survival_times(survival_function, format_func):
+    """
+    通过插值估算中位生存时间和诊断效率比最大值对应的时间点
+    
+    参数:
+    survival_function: 生存函数
+    format_func: 时间格式化函数
+    
+    返回:
+    中位生存时间和诊断效率比最大值时间点
+    """
+    if not hasattr(survival_function, 'iloc'):
+        return None, None
+    
+    # 获取曲线数据
+    times = survival_function.index
+    surv_probs = survival_function.iloc[:, 0]
+    
+    # 确保概率是递减的
+    if len(surv_probs) > 1 and surv_probs.iloc[0] < surv_probs.iloc[-1]:
+        return None, None
+    
+    # 估算中位生存时间 (生存概率=0.5)
+    median_time = None
+    max_diagnostic_ratio_time = None
+    max_diagnostic_ratio = -1  # 初始化为负值，确保能找到最大值
+    
+    # 查找中位生存时间
+    if surv_probs.min() <= 0.5 <= surv_probs.max():
+        median_idx = np.argmax(surv_probs <= 0.5)
+        if median_idx > 0:
+            # 线性插值计算中位时间
+            t1, t2 = times[median_idx-1], times[median_idx]
+            p1, p2 = surv_probs.iloc[median_idx-1], surv_probs.iloc[median_idx]
+            median_time = t1 + (0.5 - p1) * (t2 - t1) / (p2 - p1)
+    
+    # 查找诊断效率比最大值对应的时间点（排除时间0点）
+    for i in range(len(times)):
+        time_point = times[i]
+        # 跳过时间0点，因为该点的生存概率为1.0，且风险因子计算可能不准确
+        if time_point <= 0:
+            continue
+        survival_prob = surv_probs.iloc[i]
+        # 计算诊断效率比
+        ratio = diagnostic_efficacy_ratio(time_point, 1-survival_prob)
+        if ratio > max_diagnostic_ratio:
+            max_diagnostic_ratio = ratio
+            max_diagnostic_ratio_time = time_point
+    
+    return median_time, max_diagnostic_ratio_time
+
+
+def analyze_km_results(km_fitters, format_func):
+    """
+    分析KM模型结果，计算中位生存时间和诊断效率比最大值时间点
+    
+    参数:
+    km_fitters: KM拟合器字典
+    format_func: 时间格式化函数
+    
+    返回:
+    分析结果字典
+    """
+    results = {}
+    
+    for cluster_id, fitter in km_fitters.items():
+        print(f"\n=== 簇 {cluster_id} 的KM分析结果 ===")
+        
+        # 估算中位生存时间和诊断效率比最大值时间点
+        median_time, max_diagnostic_ratio_time = estimate_survival_times(
+            fitter.survival_function_, format_func
+        )
+        
+        if median_time is not None:
+            print(f"簇 {cluster_id} 中位生存时间: {format_func(median_time)} (原始值: {median_time:.2f}天)")
+        else:
+            print(f"簇 {cluster_id} 中位生存时间: 无法估算")
+            
+        if max_diagnostic_ratio_time is not None:
+            print(f"簇 {cluster_id} 最佳诊断效率比时间点: {format_func(max_diagnostic_ratio_time)} (原始值: {max_diagnostic_ratio_time:.2f}天)")
+            # 计算该时间点的诊断效率比值
+            # 需要从生存函数中获取该时间点的生存概率
+            survival_prob = np.interp(max_diagnostic_ratio_time, 
+                                    fitter.survival_function_.index, 
+                                    fitter.survival_function_.iloc[:, 0])
+            ratio = diagnostic_efficacy_ratio(max_diagnostic_ratio_time, survival_prob)
+            print(f"簇 {cluster_id} 最佳诊断效率比值: {ratio:.4f}")
+        else:
+            print(f"簇 {cluster_id} 最佳诊断效率比时间点: 无法估算")
+        
+        results[cluster_id] = {
+            'median_time': median_time,
+            'max_diagnostic_ratio_time': max_diagnostic_ratio_time
+        }
+     
+    return results
+
+
 def plot_cluster_data(cluster_id, data, title):
     """绘制簇数据的散点图"""
     plt.figure(figsize=(10, 6))
@@ -29,11 +129,13 @@ def plot_cluster_data(cluster_id, data, title):
     plt.grid(True, alpha=0.3)
     plt.show()
 
+
 def days_to_weeks_days(days):
     """将天数转换为周数和天数的格式"""
     weeks = int(days // 7)
     remaining_days = int(days % 7)
     return weeks, remaining_days
+
 
 def format_gestational_age(days):
     """格式化孕周显示"""
@@ -42,6 +144,7 @@ def format_gestational_age(days):
         return f"{weeks}周"
     else:
         return f"{weeks}周+{days}天"
+
 
 def prepare_pregnancy_data_for_km(data):
     """
@@ -92,6 +195,7 @@ def prepare_pregnancy_data_for_km(data):
                 })
     
     return pd.DataFrame(results)
+
 
 def perform_kmeans_analysis(data, n_clusters=4):
     """
@@ -152,6 +256,7 @@ def perform_kmeans_analysis(data, n_clusters=4):
     
     return kmeans, X, feature
 
+
 def perform_km_analysis(data, kmeans_model, feature):
     """
     执行Kaplan-Meier生存分析（使用新模型）
@@ -207,7 +312,7 @@ def perform_km_analysis(data, kmeans_model, feature):
             km_models[cluster_id].plot(ax=ax, ci_show=False)
     
     # 添加10%的参考线
-    ax.axhline(y=0.1, color='red', linestyle='--', alpha=0.7, label='10%未达标参考线')
+    ax.axhline(y=0.5, color='red', linestyle='--', alpha=0.7, label='生存概率中位线')
     
     ax.set_xlabel(check_time)
     ax.set_ylabel('未达标概率')
@@ -220,9 +325,28 @@ def perform_km_analysis(data, kmeans_model, feature):
     # 使用KM模型中的分析方法计算结果
     print("\n=== 各簇Kaplan-Meier分析结果 ===")
     km_model_analyzer = KMModel()
-    results = km_model_analyzer.analyze_km_results(km_fitters, format_gestational_age)
+    results = analyze_km_results(km_fitters, format_gestational_age)
+    
+    # 统一输出各簇的中位生存时间和诊断效率比最大值时间点，方便比对
+    print("\n=== KM模型分析结果 ===")
+
+    for cluster_id in sorted(results.keys()):
+        result = results[cluster_id]
+        median_time = result['median_time']
+        max_diagnostic_ratio_time = result['max_diagnostic_ratio_time']
+        
+        if median_time is not None:
+            print(f"簇 {cluster_id} 中位生存时间: {format_gestational_age(median_time)} (原始值: {median_time:.2f}天)")
+        else:
+            print(f"簇 {cluster_id} 中位生存时间: 无法估算")
+            
+        if max_diagnostic_ratio_time is not None:
+            print(f"簇 {cluster_id} 最佳诊断效率比时间点: {format_gestational_age(max_diagnostic_ratio_time)} (原始值: {max_diagnostic_ratio_time:.2f}天)")
+        else:
+            print(f"簇 {cluster_id} 最佳诊断效率比时间点: 无法估算")
     
     return results
+
 
 def main_analysis_pipeline(data):
     """
@@ -247,6 +371,7 @@ def main_analysis_pipeline(data):
         'kmeans_model': kmeans_model,
         'km_results': km_results
     }
+
 
 if __name__ == "__main__":
     data = Data.data

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # 聚类数量配置
-N_CLUSTERS = 5
+N_CLUSTERS = 4
 
 check_time = '检测孕周'
 
@@ -217,14 +217,14 @@ def plot_cox_coefficients_heatmap(cox_models):
 
 def estimate_survival_times(survival_function, format_func):
     """
-    通过插值估算中位生存时间和10%未达标时间
+    通过插值估算中位生存时间和诊断效率比最大值对应的时间点
     
     参数:
     survival_function: 生存函数
     format_func: 时间格式化函数
     
     返回:
-    中位生存时间和10%未达标时间
+    中位生存时间和诊断效率比最大值时间点
     """
     if not hasattr(survival_function, 'iloc'):
         return None, None
@@ -239,7 +239,8 @@ def estimate_survival_times(survival_function, format_func):
     
     # 估算中位生存时间 (生存概率=0.5)
     median_time = None
-    ten_percent_time = None
+    max_diagnostic_ratio_time = None
+    max_diagnostic_ratio = -1  # 初始化为负值，确保能找到最大值
     
     # 查找中位生存时间
     if surv_probs.min() <= 0.5 <= surv_probs.max():
@@ -250,20 +251,24 @@ def estimate_survival_times(survival_function, format_func):
             p1, p2 = surv_probs.iloc[median_idx-1], surv_probs.iloc[median_idx]
             median_time = t1 + (0.5 - p1) * (t2 - t1) / (p2 - p1)
     
-    # 查找10%未达标时间 (生存概率=0.1)
-    if surv_probs.min() <= 0.1 <= surv_probs.max():
-        ten_percent_idx = np.argmax(surv_probs <= 0.1)
-        if ten_percent_idx > 0:
-            # 线性插值计算10%未达标时间
-            t1, t2 = times[ten_percent_idx-1], times[ten_percent_idx]
-            p1, p2 = surv_probs.iloc[ten_percent_idx-1], surv_probs.iloc[ten_percent_idx]
-            ten_percent_time = t1 + (0.1 - p1) * (t2 - t1) / (p2 - p1)
+    # 查找诊断效率比最大值对应的时间点（排除时间0点）
+    for i in range(len(times)):
+        time_point = times[i]
+        # 跳过时间0点，因为该点的生存概率为1.0，且风险因子计算可能不准确
+        if time_point <= 0:
+            continue
+        survival_prob = surv_probs.iloc[i]
+        # 计算诊断效率比
+        ratio = diagnostic_efficacy_ratio(time_point, 1-survival_prob)
+        if ratio > max_diagnostic_ratio:
+            max_diagnostic_ratio = ratio
+            max_diagnostic_ratio_time = time_point
     
-    return median_time, ten_percent_time
+    return median_time, max_diagnostic_ratio_time
 
 def analyze_cox_results(cox_models, format_func, survival_functions):
     """
-    分析Cox模型结果，计算中位生存时间和10%未达标时间
+    分析Cox模型结果，计算中位生存时间和诊断效率比最大值时间点
     
     参数:
     cox_models: Cox模型字典
@@ -283,9 +288,9 @@ def analyze_cox_results(cox_models, format_func, survival_functions):
             if hasattr(model, 'print_summary'):
                 model.print_summary()
                 
-            # 估算中位生存时间和10%未达标时间
+            # 估算中位生存时间和诊断效率比最大值时间点
             if cluster_id in survival_functions:
-                median_time, ten_percent_time = estimate_survival_times(
+                median_time, max_diagnostic_ratio_time = estimate_survival_times(
                     survival_functions[cluster_id], format_func
                 )
                 
@@ -294,28 +299,35 @@ def analyze_cox_results(cox_models, format_func, survival_functions):
                 else:
                     print(f"簇 {cluster_id} 中位生存时间: 无法估算")
                     
-                if ten_percent_time is not None:
-                    print(f"簇 {cluster_id} 10%未达标时间: {format_func(ten_percent_time)} (原始值: {ten_percent_time:.2f}天)")
+                if max_diagnostic_ratio_time is not None:
+                    print(f"簇 {cluster_id} 最佳诊断效率比时间点: {format_func(max_diagnostic_ratio_time)} (原始值: {max_diagnostic_ratio_time:.2f}天)")
+                    # 计算该时间点的诊断效率比值
+                    # 需要从生存函数中获取该时间点的生存概率
+                    survival_prob = np.interp(max_diagnostic_ratio_time, 
+                                            survival_functions[cluster_id].index, 
+                                            survival_functions[cluster_id].iloc[:, 0])
+                    ratio = diagnostic_efficacy_ratio(max_diagnostic_ratio_time, survival_prob)
+                    print(f"簇 {cluster_id} 最佳诊断效率比值: {ratio:.4f}")
                 else:
-                    print(f"簇 {cluster_id} 10%未达标时间: 无法估算")
+                    print(f"簇 {cluster_id} 最佳诊断效率比时间点: 无法估算")
                 
                 results[cluster_id] = {
                     'median_time': median_time,
-                    'ten_percent_time': ten_percent_time
+                    'max_diagnostic_ratio_time': max_diagnostic_ratio_time
                 }
             else:
                 print(f"簇 {cluster_id} 中位生存时间: 无法估算")
-                print(f"簇 {cluster_id} 10%未达标时间: 无法估算")
+                print(f"簇 {cluster_id} 最佳诊断效率比时间点: 无法估算")
                 results[cluster_id] = {
                     'median_time': None,
-                    'ten_percent_time': None
+                    'max_diagnostic_ratio_time': None
                 }
                 
         except Exception as e:
             print(f"分析簇 {cluster_id} 时出错: {e}")
             results[cluster_id] = {
                 'median_time': None,
-                'ten_percent_time': None
+                'max_diagnostic_ratio_time': None
             }
      
     return results
@@ -460,7 +472,7 @@ def perform_cox_analysis(data, kmeans_model, feature):
     ax.set_ylim(-0.05, 1.05)
     
     # 添加10%的参考线（与KM分析保持一致）
-    ax.axhline(y=0.1, color='red', linestyle='--', alpha=0.7, label='10%未达标参考线')
+    ax.axhline(y=0.5, color='red', linestyle='--', alpha=0.7, label='生存概率中位线')
     
     # 添加图表标签和图例
     ax.set_xlabel(check_time)  # 使用check_time变量作为x轴标签
@@ -478,25 +490,25 @@ def perform_cox_analysis(data, kmeans_model, feature):
     print("\n=== 各簇Cox模型分析结果 ===")
     cox_results = analyze_cox_results(cox_models, format_gestational_age, survival_functions)
     
-    # 统一输出各簇的中位生存时间和10%未达标时间，方便比对
-    print("\n=== 统一输出各簇预测时间 ===")
+    # 统一输出各簇的中位生存时间和诊断效率比最大值时间点，方便比对
+    print("\n=== Cox模型预测结果 ===")
     for cluster_id in sorted(cox_results.keys()):
         result = cox_results[cluster_id]
         median_time = result['median_time']
-        ten_percent_time = result['ten_percent_time']
+        max_diagnostic_ratio_time = result['max_diagnostic_ratio_time']
         
         if median_time is not None:
             print(f"簇 {cluster_id} 中位生存时间: {format_gestational_age(median_time)} (原始值: {median_time:.2f}天)")
         else:
             print(f"簇 {cluster_id} 中位生存时间: 无法估算")
             
-        if ten_percent_time is not None:
-            print(f"簇 {cluster_id} 10%未达标时间: {format_gestational_age(ten_percent_time)} (原始值: {ten_percent_time:.2f}天)")
+        if max_diagnostic_ratio_time is not None:
+            print(f"簇 {cluster_id} 最佳诊断效率比时间点: {format_gestational_age(max_diagnostic_ratio_time)} (原始值: {max_diagnostic_ratio_time:.2f}天)")
         else:
-            print(f"簇 {cluster_id} 10%未达标时间: 无法估算")
+            print(f"簇 {cluster_id} 最佳诊断效率比时间点: 无法估算")
     
     # 统一输出协变量影响数据
-    print("\n=== 统一输出协变量影响数据 ===")
+    print("\n=== Cox分析:协变量影响数据 ===")
     # 收集所有模型的系数
     coefficients_data = {}
     for cluster_id, model in cox_models.items():
