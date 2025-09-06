@@ -98,10 +98,21 @@ class LogisticRegressionAnalysis:
         """预测每个样本为0和1的概率"""
         return self.model.predict_proba(X)
 
-    def predict(self, X, threshold=0.5):
+    def predict(self, X, threshold=0.11):
         """根据阈值预测类别"""
         proba = self.model.predict_proba(X)[:, 1]
         return (proba >= threshold).astype(int)
+    def evaluate(self, X, y, threshold=0.11):
+        y_pred = self.predict(X, threshold)
+        proba = self.predict_proba(X)[:, 1]
+        acc = accuracy_score(y, y_pred)
+        auc = roc_auc_score(y, proba)
+        cm = confusion_matrix(y, y_pred)
+        return {
+            "Accuracy": acc,
+            "AUC": auc,
+            "ConfusionMatrix": cm
+        }
 
         
 
