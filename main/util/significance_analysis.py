@@ -56,13 +56,14 @@ class LinearRegressionAnalysis:
 class LogisticRegressionAnalysis:
     def __init__(self):
         """初始化逻辑回归分析模型"""
-        self.model = LogisticRegression()
+        self.class_weight={0:1,1:1}
+        self.model = LogisticRegression(class_weight=self.class_weight, random_state=42, max_iter=1000)
         self.coef_ = None       # 回归系数
         self.intercept_ = None  # 截距项
         self.std_err = None     # 系数标准误
         self.z_values = None    # z统计量
         self.p_values = None    # p值
-
+        self.threshold = 0.11
     def fit(self, X, y):
         self.model.fit(X, y)
         self.coef_ = self.model.coef_[0]
@@ -94,7 +95,29 @@ class LogisticRegressionAnalysis:
             f'ci_{int((1-alpha)*100)}%_lower': ci_lower,
             f'ci_{int((1-alpha)*100)}%_upper': ci_upper
         }
+    def predict_proba(self, X):
+        """预测每个样本为0和1的概率"""
+        return self.model.predict_proba(X)
 
+    def predict(self, X, threshold=None):
+        if threshold is None:
+            threshold = self.threshold
+        """根据阈值预测类别"""
+        proba = self.model.predict_proba(X)[:, 1]
+        return (proba >= threshold).astype(int)
+    def evaluate(self, X, y, threshold=None):
+        if threshold is None:
+            threshold = self.threshold
+        y_pred = self.predict(X, threshold)
+        proba = self.predict_proba(X)[:, 1]
+        acc = accuracy_score(y, y_pred)
+        auc = roc_auc_score(y, proba)
+        cm = confusion_matrix(y, y_pred)
+        return {
+            "Accuracy": acc,
+            "AUC": auc,
+            "ConfusionMatrix": cm
+        }
 
         
 
