@@ -7,6 +7,10 @@ import seaborn as sns
 
 check_time = '检测孕周'
 
+# 定义聚类特征和Cox计算特征，方便调整
+CLUSTER_FEATURES = ['孕妇BMI']
+COX_FEATURE_COLUMNS = ['年龄', '检测抽血次数', '检测孕周', '原始读段数', 
+                      '在参考基因组上比对的比例', 'Y染色体的Z值']
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
@@ -20,8 +24,8 @@ from data.util.draw import draw_col_seaborn, draw_col_hot_map_seaborn
 def plot_cluster_data(cluster_id, data, title):
     """绘制簇数据的散点图"""
     plt.figure(figsize=(10, 6))
-    plt.scatter(data[check_time], data['Y染色体浓度'], alpha=0.7)
-    plt.xlabel(check_time)
+    plt.scatter(data['检测孕周'], data['Y染色体浓度'], alpha=0.7)
+    plt.xlabel('检测孕周')
     plt.ylabel('Y染色体浓度')
     plt.title(f'{title} - 簇 {cluster_id}')
     plt.grid(True, alpha=0.3)
@@ -56,7 +60,7 @@ def prepare_pregnancy_data_for_cox(data):
     
     for woman_id, group in grouped:
         # 按检测孕周排序
-        group = group.sort_values(check_time)
+        group = group.sort_values('检测孕周')
         
         # 找到所有达标检测（Y染色体浓度 >= 0.04）
         qualified_tests = group[group['Y染色体浓度'] >= Y_THRESHOLD]
@@ -67,7 +71,7 @@ def prepare_pregnancy_data_for_cox(data):
         # 如果有达标检测
         if len(qualified_tests) > 0:
             # 第一次达标时间
-            first_qualified_time = qualified_tests.iloc[0][check_time]
+            first_qualified_time = qualified_tests.iloc[0]['检测孕周']
             
             # 添加记录：事件发生（达标）
             results.append({
@@ -86,7 +90,7 @@ def prepare_pregnancy_data_for_cox(data):
         else:
             # 如果没有达标检测，使用最后一次检测时间作为删失时间
             if len(group) > 0:
-                last_test_time = group.iloc[-1][check_time]
+                last_test_time = group.iloc[-1]['检测孕周']
                 results.append({
                     '孕妇代码': woman_id,
                     '事件时间': last_test_time,
@@ -96,7 +100,7 @@ def prepare_pregnancy_data_for_cox(data):
                     '检测孕周': group.iloc[0]['检测孕周'],
                     '原始读段数': group.iloc[0]['原始读段数'] if '原始读段数' in group.columns else np.nan,
                     '在参考基因组上比对的比例': group.iloc[0]['在参考基因组上比对的比例'] if '在参考基因组上比对的比例' in group.columns else np.nan,
-                'Y染色体的Z值': group.iloc[0]['Y染色体的Z值'] if 'Y染色体的Z值' in group.columns else np.nan,
+                'Y染色体的Z值': group.iloc[0]['Y染色体的Z값'] if 'Y染色体的Z값' in group.columns else np.nan,
                     'Y染色体浓度': group.iloc[0]['Y染色体浓度'],  # 添加Y染色体浓度用于聚类
                     '孕妇BMI': group.iloc[0]['孕妇BMI'] if '孕妇BMI' in group.columns else np.nan  # 添加孕妇BMI用于聚类
                 })
@@ -115,12 +119,43 @@ def perform_kmeans_analysis(data, n_clusters=4):
     kmeans模型和聚类结果
     """
     # 特征选择 - 仅使用孕妇BMI
-    feature = ['孕妇BMI']
+    feature = CLUSTER_FEATURES
     X = data[feature].dropna()
     
     # 训练K-means模型
     kmeans = KMeansCluster(n_clusters=n_clusters)
     kmeans.train(X)
+    
+    # 重新映射聚类标签，使标签按聚类中心数值递增排序
+    # 获取聚类中心
+    centers = kmeans.get_cluster_centers()
+    
+    # 如果使用单个特征进行聚类
+    if len(feature) == 1:
+        # 根据聚类中心的第一个特征值对标签进行排序
+        sorted_indices = np.argsort(centers[:, 0])
+    else:
+        # 如果使用多个特征，根据第一个特征排序
+        sorted_indices = np.argsort(centers[:, 0])
+    
+    # 创建标签映射
+    label_mapping = {old_label: new_label for new_label, old_label in enumerate(sorted_indices)}
+    
+    # 重新映射训练数据的标签
+    remapped_labels = np.array([label_mapping[label] for label in kmeans.get_labels()])
+    kmeans.labels_ = remapped_labels
+    
+    # 重新映射聚类中心顺序
+    remapped_centers = centers[sorted_indices]
+    kmeans.cluster_centers_ = remapped_centers
+    
+    # 更新模型的预测方法，使其使用新的标签映射
+    original_predict = kmeans.model.predict
+    def remapped_predict(X):
+        original_labels = original_predict(X)
+        return np.array([label_mapping[label] for label in original_labels])
+    
+    kmeans.model.predict = remapped_predict
     
     # 输出聚类信息
     print("聚类中心:")
@@ -322,8 +357,7 @@ def perform_cox_analysis(data, kmeans_model, feature):
 
     # 使用新的Cox模型进行分析
     # 选择新的特征列（不包括BMI）
-    feature_columns = ['年龄', '检测抽血次数', '检测孕周', '原始读段数', 
-                      '在参考基因组上比对的比例', 'Y染色体的Z值']
+    feature_columns = COX_FEATURE_COLUMNS
     
     # 为每个簇拟合Cox模型
     cox_models = {}
@@ -428,7 +462,7 @@ def perform_cox_analysis(data, kmeans_model, feature):
     ax.axhline(y=0.1, color='red', linestyle='--', alpha=0.7, label='10%未达标参考线')
     
     # 添加图表标签和图例
-    ax.set_xlabel('时间（孕周）')
+    ax.set_xlabel(check_time)  # 使用check_time变量作为x轴标签
     ax.set_ylabel('生存概率')
     ax.set_title('各簇的Cox模型生存函数')
     ax.legend()

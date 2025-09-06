@@ -110,6 +110,32 @@ def perform_kmeans_analysis(data, n_clusters=4):
     kmeans = KMeansCluster(n_clusters=n_clusters)
     kmeans.train(X)
     
+    # 重新映射聚类标签，使标签按聚类中心数值递增排序
+    # 获取聚类中心
+    centers = kmeans.get_cluster_centers()
+    
+    # 根据第一个特征（孕妇BMI）对标签进行排序
+    sorted_indices = np.argsort(centers[:, 0])
+    
+    # 创建标签映射
+    label_mapping = {old_label: new_label for new_label, old_label in enumerate(sorted_indices)}
+    
+    # 重新映射训练数据的标签
+    remapped_labels = np.array([label_mapping[label] for label in kmeans.get_labels()])
+    kmeans.labels_ = remapped_labels
+    
+    # 重新映射聚类中心顺序
+    remapped_centers = centers[sorted_indices]
+    kmeans.cluster_centers_ = remapped_centers
+    
+    # 更新模型的预测方法，使其使用新的标签映射
+    original_predict = kmeans.model.predict
+    def remapped_predict(X):
+        original_labels = original_predict(X)
+        return np.array([label_mapping[label] for label in original_labels])
+    
+    kmeans.model.predict = remapped_predict
+    
     # 输出聚类信息
     print("聚类中心:")
     print(kmeans.get_cluster_centers())
