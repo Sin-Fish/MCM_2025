@@ -27,12 +27,6 @@ class GAMModel:
             X: 特征矩阵 (n_samples, n_features)
             y: 目标变量 (n_samples,)
         '''
-        # 如果没有指定样条函数，自动为每个特征配置光滑样条
-        if self.splines is None:
-            self.splines = s(0) + s(1) + s(2) + s(3)  # 为4个特征都配置光滑样条
-        
-        self.model = LinearGAM(self.splines)
-        
         # 如果X是pandas DataFrame，记录特征名
         if hasattr(X, 'columns'):
             self.feature_names_ = X.columns.tolist()
@@ -41,6 +35,17 @@ class GAMModel:
             self.feature_names_ = [f'x{i}' for i in range(X.shape[1])]
             X_array = X
             
+        # 如果没有指定样条函数，自动为每个特征配置光滑样条
+        if self.splines is None:
+            n_features = X_array.shape[1]
+            if n_features == 1:
+                self.splines = s(0)
+            else:
+                self.splines = s(0)
+                for i in range(1, n_features):
+                    self.splines += s(i)
+        
+        self.model = LinearGAM(self.splines)
         self.model.fit(X_array, y)
     
     def predict(self, X):
