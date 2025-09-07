@@ -6,8 +6,8 @@ config = {
 
 }
 
-file_name = "cleaned_data_female"
+#file_name = "cleaned_data_female"
 
-#file_name = "new_cleaned_data_male"
+file_name = "new_cleaned_data_male"
 
 #file_name = "女胎检测数据"
