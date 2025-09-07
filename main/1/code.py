@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 
 if __name__ == "__main__":  
     data = Data.data
-    X = data[['检测孕周', '孕妇BMI','检测抽血次数','年龄']].dropna()
+    X = data[['检测孕周', '孕妇BMI','检测抽血次数','年龄',"Y染色体的Z值"]].dropna()
     y = data.loc[X.index, 'Y染色体浓度']
     
     # 划分训练集和测试集 (80%训练, 20%测试)

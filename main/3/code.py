@@ -13,8 +13,8 @@ check_time = '检测孕周'
 
 # 定义聚类特征和Cox计算特征，方便调整
 CLUSTER_FEATURES = ['孕妇BMI']
-COX_FEATURE_COLUMNS = ['年龄', '检测抽血次数', '检测孕周', '原始读段数', 
-                      '在参考基因组上比对的比例']
+COX_FEATURE_COLUMNS = ['年龄', '检测抽血次数', '检测孕周','身高','体重',
+                      "Y染色体的Z值"]
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
@@ -89,6 +89,11 @@ def prepare_pregnancy_data_for_cox(data):
                 '在参考基因组上比对的比例': group.iloc[0]['在参考基因组上比对的比例'] if '在参考基因组上比对的比例' in group.columns else np.nan,
                 'Y染色体浓度': group.iloc[0]['Y染色体浓度'],  # 添加Y染色体浓度用于聚类
                 '孕妇BMI': group.iloc[0]['孕妇BMI'] if '孕妇BMI' in group.columns else np.nan  # 添加孕妇BMI用于聚类
+                ,'Y染色体的Z值': group.iloc[0]['Y染色体的Z值'] if 'Y染色体的Z值' in group.columns else np.nan
+                ,'被过滤掉读段数的比例':group.iloc[0]['被过滤掉读段数的比例'] if '被过滤掉读段数的比例' in group.columns else np.nan
+                ,'GC含量': group.iloc[0]['GC含量'] if 'GC含量' in group.columns else np.nan
+                ,'身高': group.iloc[0]['身高'] if '身高' in group.columns else np.nan
+                ,'体重': group.iloc[0]['体重'] if '体重' in group.columns else np.nan
             })
         else:
             # 如果没有达标检测，使用最后一次检测时间作为删失时间
@@ -186,7 +191,7 @@ def plot_cox_coefficients_heatmap(cox_models):
         if hasattr(model, 'get_coefficients'):
             try:
                 coeffs = model.get_coefficients()
-                coefficients_data[f'簇 {cluster_id}'] = coeffs
+                coefficients_data[f'簇 {cluster_id}'] =coeffs
             except:
                 continue
     
