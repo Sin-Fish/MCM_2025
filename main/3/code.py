@@ -377,6 +377,7 @@ def perform_cox_analysis(data, kmeans_model, feature):
     cox_models = {}
     survival_functions = {}
     best_times = {}  # 存储每个簇的最佳诊断效率比时间点
+    curve_colors = {}  # 存储每条曲线的颜色
     
     # 创建用于绘制生存曲线的图表
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -461,7 +462,7 @@ def perform_cox_analysis(data, kmeans_model, feature):
                         plot_probs = np.array([1.0])
                     
                     # 绘制曲线
-                    line = ax.plot(plot_times, plot_probs, label=f'簇 {cluster_id}')
+                    ax.plot(plot_times, plot_probs, label=f'簇 {cluster_id}')
                     
                     # 计算并存储最佳诊断效率比时间点
                     median_time, max_diagnostic_ratio_time = estimate_survival_times(
@@ -475,16 +476,27 @@ def perform_cox_analysis(data, kmeans_model, feature):
             except Exception as e:
                 print(f"簇 {cluster_id} 的Cox模型拟合失败: {e}")
     
+    # 获取每条曲线的实际颜色
+    lines = ax.get_lines()
+    curve_colors = {}
+    # 假设每条曲线对应一个簇，按顺序分配颜色
+    start_index = 0  # 起始线条索引
+    for cluster_id in range(kmeans_model.n_clusters):
+        # 计算当前簇在lines中的索引位置
+        if len(cox_data_clean[cox_data_clean['cluster'] == cluster_id]) > 0:
+            line_index = start_index + cluster_id
+            if line_index < len(lines):
+                curve_colors[cluster_id] = lines[line_index].get_color()
+
     # 在图表上标记最佳诊断效率比时间点
-    colors = plt.cm.get_cmap('tab10', kmeans_model.n_clusters)
     for cluster_id, best_time in best_times.items():
         if best_time is not None and cluster_id in survival_functions:
             # 获取该时间点的生存概率
             survival_prob = np.interp(best_time, 
                                     survival_functions[cluster_id].index, 
                                     survival_functions[cluster_id].iloc[:, 0])
-            # 绘制点标记，Y轴是生存概率，直接使用计算得到的生存概率值
-            ax.plot(best_time, survival_prob, 'o', color=colors(cluster_id), 
+            # 绘制点标记，使用与曲线相同的颜色
+            ax.plot(best_time, survival_prob, 'o', color=curve_colors.get(cluster_id, 'gray'), 
                    markersize=8, markeredgecolor='black', markeredgewidth=1,
                    label=f'簇 {cluster_id} 最佳时间点')
     

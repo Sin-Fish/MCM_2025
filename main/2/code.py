@@ -318,16 +318,24 @@ def perform_km_analysis(data, kmeans_model, feature):
             )
             best_times[cluster_id] = max_diagnostic_ratio_time
     
+    # 获取每条曲线的颜色
+    lines = ax.get_lines()
+    curve_colors = {}
+    # 假设每条曲线对应一个簇，按顺序分配颜色
+    for i, cluster_id in enumerate(range(kmeans_model.n_clusters)):
+        if len(km_data_clean[km_data_clean['cluster'] == cluster_id]) > 0 and i < len(lines):
+            curve_colors[cluster_id] = lines[i].get_color()
+    
     # 在图表上标记最佳诊断效率比时间点
-    colors = plt.cm.get_cmap('tab10', kmeans_model.n_clusters)
     for cluster_id, best_time in best_times.items():
-        if best_time is not None:
+        if best_time is not None and cluster_id in curve_colors:
             # 获取该时间点的生存概率（未达标概率 = 1 - 生存概率）
             survival_prob = np.interp(best_time, 
                                     km_fitters[cluster_id].survival_function_.index, 
                                     km_fitters[cluster_id].survival_function_.iloc[:, 0])
-            # 绘制点标记，注意Y轴是未达标概率，所以需要使用 (1 - 生存概率)
-            ax.plot(best_time,  survival_prob, 'o', color=colors(cluster_id), 
+            # 绘制点标记，使用与曲线相同的颜色
+            # 注意：Y轴是未达标概率，所以需要使用 (1 - 生存概率)
+            ax.plot(best_time,survival_prob, 'o', color=curve_colors[cluster_id], 
                    markersize=8, markeredgecolor='black', markeredgewidth=1,
                    label=f'簇 {cluster_id} 最佳时间点')
     
@@ -395,6 +403,4 @@ def main_analysis_pipeline(data):
 
 if __name__ == "__main__":
     data = Data.data
-    
-    # 执行主分析流程
     analysis_results = main_analysis_pipeline(data)
