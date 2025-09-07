@@ -1,9 +1,10 @@
-from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.ensemble import GradientBoostingRegressor, GradientBoostingClassifier
 import numpy as np
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data.util.data_manager import Data
+
 class GBDTRegressor:
     def __init__(self, learning_rate=0.1, n_estimators=100, max_depth=3):
         self.model = GradientBoostingRegressor(
@@ -13,7 +14,7 @@ class GBDTRegressor:
         )
 
     def train(self, X, y):
-        '''训练梯度提升树模型
+        '''训练梯度提升树回归模型
         Args:
             X: 特征矩阵 (n_samples, n_features)
             y: 目标变量 (n_samples,)
@@ -27,6 +28,35 @@ class GBDTRegressor:
     def get_feature_importance(self):
         '''获取特征重要性'''
         return self.model.feature_importances_
+
+class GBDTClassifier:
+    def __init__(self, learning_rate=0.1, n_estimators=100, max_depth=3):
+        self.model = GradientBoostingClassifier(
+            learning_rate=learning_rate,
+            n_estimators=n_estimators,
+            max_depth=max_depth
+        )
+
+    def train(self, X, y):
+        '''训练梯度提升树分类模型
+        Args:
+            X: 特征矩阵 (n_samples, n_features)
+            y: 目标变量 (n_samples,)
+        '''
+        self.model.fit(X, y)
+
+    def predict(self, X):
+        '''返回预测类别'''
+        return self.model.predict(X)
+    
+    def predict_proba(self, X):
+        '''返回预测概率'''
+        return self.model.predict_proba(X)
+
+    def get_feature_importance(self):
+        '''获取特征重要性'''
+        return self.model.feature_importances_
+
 if __name__ == "__main__":  
     data = Data.data
     X = data[['检测孕周', '孕妇BMI']]

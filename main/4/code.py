@@ -5,8 +5,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 sys.path.append(project_root)
 import numpy as np
 from data.util.data_manager import Data
-# 使用main.util目录下的逻辑回归分析模型，它包含calculate_significance方法
-from main.util.significance_analysis import LogisticRegressionAnalysis
+# 使用GBDT分类模型替换逻辑回归分析模型
+from model.gbdt import GBDTClassifier
 from sklearn.preprocessing import StandardScaler
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import pandas as pd
@@ -29,6 +29,9 @@ def create_target_variable(data, target_type):
     else:
         y = (~data['染色体的非整倍体'].isna()).astype(int)
     return y
+
+# 创建一个字典来存储所有模型的结果，用于统一输出
+all_model_results = {}
 
 if __name__ == '__main__':
     data = Data.data
@@ -60,6 +63,7 @@ if __name__ == '__main__':
         print(f"异常组的Z值均值: {z_values[is_abnormal == 1].mean()}")
         print(f"正常组的Z值均值: {z_values[is_abnormal == 0].mean()}")
         print(f"Z值与异常的相关性: {z_values.corr(is_abnormal)}")
+    
     for target_type in target_types:
         print(f"\n=== 训练{target_type}预测模型 ===")
         # 创建目标变量
@@ -70,7 +74,8 @@ if __name__ == '__main__':
             raw_X, y, test_size=0.3, random_state=42, stratify=y
         )
         
-        # 标准化特征
+        # 注意：GBDT模型不需要特征标准化，但为了保持一致性，我们仍保留此步骤
+        # 但在实际使用中，GBDT可以直接使用原始特征
         scaler = StandardScaler()
         X_train_scaled = scaler.fit_transform(X_train)
         X_test_scaled = scaler.transform(X_test)
@@ -85,25 +90,19 @@ if __name__ == '__main__':
         print(f"{target_type} VIF 检查结果：")
         print(vif_data)
         
-        # 训练模型
-        model = LogisticRegressionAnalysis()
-        model.fit(X_train_scaled, y_train)
+        # 训练GBDT分类模型
+        model = GBDTClassifier(n_estimators=150, max_depth=5)
+        model.train(X_train_scaled, y_train)
         
-        # 计算显著性
-        result = model.calculate_significance()
-        summary_df = pd.DataFrame({
+        # 获取特征重要性（GBDT模型特有的方法）
+        feature_importance = model.get_feature_importance()
+        importance_df = pd.DataFrame({
             "Feature": raw_X.columns,
-            "Coefficient": result['coefficients'],
-            "StdErr": result['std_error'],
-            "z_value": result['z_values'],
-            "p_value": result['p_values'],
-            "CI_lower": result['ci_95%_lower'],
-            "CI_upper": result['ci_95%_upper']
-        })
-
-        # 显示显著性分析结果
-        print(f"\n{target_type} 显著性分析结果：")
-        print(summary_df)
+            "Importance": feature_importance
+        }).sort_values(by="Importance", ascending=False)
+        
+        print(f"\n{target_type} 特征重要性分析结果：")
+        print(importance_df)
 
         # 在测试集上预测
         y_pred = model.predict(X_test_scaled)
@@ -129,12 +128,16 @@ if __name__ == '__main__':
         plt.grid(True)
         plt.show()
 
+        # 计算评估指标
+        accuracy = accuracy_score(y_test, y_pred)
+        auc = roc_auc_score(y_test, y_proba)
+        
         print(f"{target_type} 最优阈值:", optimal_threshold)
         print(f"{target_type} 对应 TPR:", tpr[idx], "FPR:", fpr[idx])
 
         print(f"\n{target_type} 模型评估：")
-        print("准确率 (Accuracy):", accuracy_score(y_test, y_pred))
-        print("AUC:", roc_auc_score(y_test, y_proba))
+        print("准确率 (Accuracy):", accuracy)
+        print("AUC:", auc)
         print("混淆矩阵:\n", confusion_matrix(y_test, y_pred))
         
         # 保存模型和结果
@@ -146,5 +149,24 @@ if __name__ == '__main__':
             'optimal_threshold': optimal_threshold,
             'fpr': fpr,
             'tpr': tpr,
-            'summary': summary_df
+            'importance': importance_df
         }
+        
+        # 保存结果用于统一输出
+        all_model_results[target_type] = {
+            'accuracy': accuracy,
+            'auc': auc,
+            'top3_features': importance_df.head(3)
+        }
+    
+    # 统一输出所有模型的准确率和AUC值，以及前三个重要特征
+    print("\n=== 统一输出各模型评估结果 ===")
+    print("(特征按重要性从高到低排序)")
+    for target_type in target_types:
+        result = all_model_results[target_type]
+        print(f"\n{target_type}模型:")
+        print(f"  准确率: {result['accuracy']:.4f}")
+        print(f"  AUC值: {result['auc']:.4f}")
+        print("  前三个重要特征 (按重要性从高到低):")
+        for i, (index, row) in enumerate(result['top3_features'].iterrows(), 1):
+            print(f"    {i}. {row['Feature']} (重要性: {row['Importance']:.4f})")
