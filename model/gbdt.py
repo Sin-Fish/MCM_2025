@@ -37,13 +37,14 @@ class GBDTClassifier:
             max_depth=max_depth
         )
 
-    def train(self, X, y):
+    def train(self, X, y, sample_weight=None):
         '''训练梯度提升树分类模型
         Args:
             X: 特征矩阵 (n_samples, n_features)
             y: 目标变量 (n_samples,)
+            sample_weight: 样本权重 (n_samples,)
         '''
-        self.model.fit(X, y)
+        self.model.fit(X, y, sample_weight=sample_weight)
 
     def predict(self, X):
         '''返回预测类别'''

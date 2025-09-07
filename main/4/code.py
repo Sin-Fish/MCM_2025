@@ -10,9 +10,11 @@ from model.gbdt import GBDTClassifier
 from sklearn.preprocessing import StandardScaler
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
 from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix
-from sklearn.metrics import roc_curve, roc_auc_score
+from sklearn.metrics import roc_curve, roc_auc_score, classification_report
+from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.utils.class_weight import compute_sample_weight
 import matplotlib.pyplot as plt
 
 def create_target_variable(data, target_type):
@@ -69,10 +71,19 @@ if __name__ == '__main__':
         # 创建目标变量
         y = create_target_variable(data, target_type)
         
+        # 输出每个类别的数据量
+        unique, counts = np.unique(y, return_counts=True)
+        print(f"{target_type} 类别分布:")
+        for label, count in zip(unique, counts):
+            print(f"  类别 {label}: {count} 样本")
+        
         # 划分训练集和测试集
         X_train, X_test, y_train, y_test = train_test_split(
             raw_X, y, test_size=0.3, random_state=42, stratify=y
         )
+        
+        # 计算样本权重以平衡类别
+        sample_weights = compute_sample_weight('balanced', y_train)
         
         # 注意：GBDT模型不需要特征标准化，但为了保持一致性，我们仍保留此步骤
         # 但在实际使用中，GBDT可以直接使用原始特征
@@ -90,9 +101,19 @@ if __name__ == '__main__':
         print(f"{target_type} VIF 检查结果：")
         print(vif_data)
         
-        # 训练GBDT分类模型
-        model = GBDTClassifier(n_estimators=150, max_depth=5)
-        model.train(X_train_scaled, y_train)
+        # 训练GBDT分类模型，使用样本权重平衡少数类，并调整模型参数
+        model = GBDTClassifier(n_estimators=200, max_depth=4, learning_rate=0.05)
+        model.train(X_train_scaled, y_train, sample_weight=sample_weights)
+        
+        # 进行交叉验证
+        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        cv_scores_accuracy = cross_val_score(model.model, X_train_scaled, y_train, cv=cv, scoring='accuracy')
+        cv_scores_roc_auc = cross_val_score(model.model, X_train_scaled, y_train, cv=cv, scoring='roc_auc')
+        cv_scores_f1 = cross_val_score(model.model, X_train_scaled, y_train, cv=cv, scoring='f1')
+        
+        print(f"{target_type} 交叉验证准确率: {cv_scores_accuracy.mean():.4f} (+/- {cv_scores_accuracy.std() * 2:.4f})")
+        print(f"{target_type} 交叉验证AUC: {cv_scores_roc_auc.mean():.4f} (+/- {cv_scores_roc_auc.std() * 2:.4f})")
+        print(f"{target_type} 交叉验证F1分数: {cv_scores_f1.mean():.4f} (+/- {cv_scores_f1.std() * 2:.4f})")
         
         # 获取特征重要性（GBDT模型特有的方法）
         feature_importance = model.get_feature_importance()
@@ -111,10 +132,18 @@ if __name__ == '__main__':
         # 计算 FPR, TPR 和 阈值
         fpr, tpr, thresholds = roc_curve(y_test, y_proba)
 
-        # 计算 Youden's J statistic 找最优阈值
-        J = tpr - fpr
-        idx = J.argmax()
+        # 使用F1分数寻找最优阈值，而不是Youden's J statistic
+        f1_scores = []
+        for i in range(len(thresholds)):
+            y_pred_thresh = (y_proba >= thresholds[i]).astype(int)
+            f1_scores.append(f1_score(y_test, y_pred_thresh, zero_division=0))
+        
+        # 找到最优阈值
+        idx = np.argmax(f1_scores)
         optimal_threshold = thresholds[idx]
+        
+        # 使用最优阈值进行预测
+        y_pred_optimal = (y_proba >= optimal_threshold).astype(int)
 
         # 绘制 ROC 曲线
         plt.figure(figsize=(8,6))
@@ -129,7 +158,10 @@ if __name__ == '__main__':
         plt.show()
 
         # 计算评估指标
-        accuracy = accuracy_score(y_test, y_pred)
+        accuracy = accuracy_score(y_test, y_pred_optimal)
+        precision = precision_score(y_test, y_pred_optimal, zero_division=0)
+        recall = recall_score(y_test, y_pred_optimal, zero_division=0)
+        f1 = f1_score(y_test, y_pred_optimal, zero_division=0)
         auc = roc_auc_score(y_test, y_proba)
         
         print(f"{target_type} 最优阈值:", optimal_threshold)
@@ -137,14 +169,19 @@ if __name__ == '__main__':
 
         print(f"\n{target_type} 模型评估：")
         print("准确率 (Accuracy):", accuracy)
+        print("精确率 (Precision):", precision)
+        print("召回率 (Recall):", recall)
+        print("F1分数:", f1)
         print("AUC:", auc)
-        print("混淆矩阵:\n", confusion_matrix(y_test, y_pred))
+        print("混淆矩阵:\n", confusion_matrix(y_test, y_pred_optimal))
+        print("\n详细分类报告:")
+        print(classification_report(y_test, y_pred_optimal))
         
         # 保存模型和结果
         models[target_type] = model
         results[target_type] = {
             'y_test': y_test,
-            'y_pred': y_pred,
+            'y_pred': y_pred_optimal,
             'y_proba': y_proba,
             'optimal_threshold': optimal_threshold,
             'fpr': fpr,
@@ -155,7 +192,13 @@ if __name__ == '__main__':
         # 保存结果用于统一输出
         all_model_results[target_type] = {
             'accuracy': accuracy,
+            'precision': precision,
+            'recall': recall,
+            'f1': f1,
             'auc': auc,
+            'cv_score_accuracy': cv_scores_accuracy.mean(),
+            'cv_score_auc': cv_scores_roc_auc.mean(),
+            'cv_score_f1': cv_scores_f1.mean(),
             'top3_features': importance_df.head(3)
         }
     
@@ -166,7 +209,13 @@ if __name__ == '__main__':
         result = all_model_results[target_type]
         print(f"\n{target_type}模型:")
         print(f"  准确率: {result['accuracy']:.4f}")
+        print(f"  精确率: {result['precision']:.4f}")
+        print(f"  召回率: {result['recall']:.4f}")
+        print(f"  F1分数: {result['f1']:.4f}")
         print(f"  AUC值: {result['auc']:.4f}")
+        print(f"  交叉验证准确率: {result['cv_score_accuracy']:.4f}")
+        print(f"  交叉验证AUC: {result['cv_score_auc']:.4f}")
+        print(f"  交叉验证F1分数: {result['cv_score_f1']:.4f}")
         print("  前三个重要特征 (按重要性从高到低):")
         for i, (index, row) in enumerate(result['top3_features'].iterrows(), 1):
             print(f"    {i}. {row['Feature']} (重要性: {row['Importance']:.4f})")
