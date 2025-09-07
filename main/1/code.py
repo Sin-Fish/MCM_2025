@@ -7,11 +7,12 @@ from data.util.data_manager import Data
 from model.gam import GAMModel
 from sklearn.model_selection import train_test_split
 from main.util.significance_analysis import GAMRegressionAnalysis
+from pygam import s
 
 
 if __name__ == "__main__":  
     data = Data.data
-    X = data[['检测孕周', '孕妇BMI','检测抽血次数','年龄']].dropna()
+    X = data[['检测孕周', '孕妇BMI','年龄',"检测抽血次数"]].dropna()
     y = data.loc[X.index, 'Y染色体浓度']
     
     # 划分训练集和测试集 (80%训练, 20%测试)
@@ -21,7 +22,9 @@ if __name__ == "__main__":
     print(f"测试集样本数: {len(X_test)}")
     
     # 训练模型
-    regressor = GAMModel()
+    # 创建与特征数量匹配的样条函数
+    splines = s(0) + s(1) + s(2) + s(3)  # 使用4个特征
+    regressor = GAMModel(splines=splines)
     regressor.train(X_train, y_train)
     
     # 评估训练集性能
@@ -40,7 +43,7 @@ if __name__ == "__main__":
     
     # 使用显著性分析工具进行GAM模型显著性分析
     print(f"\nGAM模型显著性分析:")
-    gam_analysis = GAMRegressionAnalysis()
+    gam_analysis = GAMRegressionAnalysis(splines=splines)
     gam_analysis.fit(X_train, y_train)
     significance_result = gam_analysis.calculate_significance()
     

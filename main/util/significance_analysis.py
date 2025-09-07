@@ -119,9 +119,12 @@ class GAMRegressionAnalysis:
 
         # 获取每个特征的显著性检验结果
         feature_significance = []
-        for i in range(len(self.coef_)):
+        # 只显示与输入特征数量相同的系数
+        n_input_features = len(self.feature_names_) if self.feature_names_ else n_features
+        for i in range(min(n_features, n_input_features)):
+            feature_name = self.feature_names_[i] if self.feature_names_ and i < len(self.feature_names_) else f'x{i}'
             feature_significance.append({
-                'feature': self.feature_names_[i] if self.feature_names_ else f'x{i}',
+                'feature': feature_name,
                 'coefficient': self.coef_[i],
                 'std_error': self.std_err[i],
                 't_value': self.t_values[i],
@@ -204,9 +207,9 @@ class LogisticRegressionAnalysis:
         return self.model.predict_proba(X)
 
     def predict(self, X, threshold=None):
+        """根据阈值预测类别"""
         if threshold is None:
             threshold = self.threshold
-        """根据阈值预测类别"""
         proba = self.model.predict_proba(X)[:, 1]
         return (proba >= threshold).astype(int)
     def evaluate(self, X, y, threshold=None):
