@@ -20,12 +20,37 @@ class data_manager:
             print(f"正在导入数据文件 {file_path}")
             # 根据文件扩展名自动选择读取方式
             if file_path.endswith('.csv'):
-                data = pd.read_csv(file_path, encoding='utf-8-sig')
+                # 尝试多种编码方式读取CSV文件
+                encodings = ['utf-8-sig', 'utf-8', 'gbk', 'gb2312', 'latin1']
+                data = None
+                for encoding in encodings:
+                    try:
+                        data = pd.read_csv(file_path, encoding=encoding)
+                        print(f"使用 {encoding} 编码成功读取文件")
+                        break
+                    except Exception as e:
+                        print(f"使用 {encoding} 编码读取失败: {str(e)[:50]}...")
+                        continue
+                
+                if data is None:
+                    raise Exception("无法使用任何编码读取文件")
             elif file_path.endswith(('.xlsx', '.xls')):
                 data = pd.read_excel(file_path)
             else:
                 # 默认尝试读取CSV
-                data = pd.read_csv(file_path, encoding='utf-8-sig')
+                encodings = ['utf-8-sig', 'utf-8', 'gbk', 'gb2312', 'latin1']
+                data = None
+                for encoding in encodings:
+                    try:
+                        data = pd.read_csv(file_path, encoding=encoding)
+                        print(f"使用 {encoding} 编码成功读取文件")
+                        break
+                    except Exception as e:
+                        print(f"使用 {encoding} 编码读取失败: {str(e)[:50]}...")
+                        continue
+                
+                if data is None:
+                    raise Exception("无法使用任何编码读取文件")
         except Exception as e:
             print(f"导入数据文件 {file_path} 失败：{e}")
             return None

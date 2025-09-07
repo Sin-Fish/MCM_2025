@@ -1,0 +1,146 @@
+{
+  "y_0.05": {
+    "50": {
+      "baseline_value": 97.875,
+      "baseline_formatted": "13周+6天",
+      "simulation_mean": 99.2625,
+      "simulation_formatted": "14周+1天",
+      "difference": 1.3875000000000028,
+      "coefficient_of_variation": 0.010339200743032873
+    },
+    "90": {
+      "baseline_value": 146.02499999999998,
+      "baseline_formatted": "20周+6天",
+      "simulation_mean": 146.0455,
+      "simulation_formatted": "20周+6天",
+      "difference": 0.02050000000002683,
+      "coefficient_of_variation": 0.01884432991445662
+    }
+  },
+  "y_0.1": {
+    "50": {
+      "baseline_value": 97.875,
+      "baseline_formatted": "13周+6天",
+      "simulation_mean": 100.98,
+      "simulation_formatted": "14周+2天",
+      "difference": 3.105000000000004,
+      "coefficient_of_variation": 0.017913395624236363
+    },
+    "90": {
+      "baseline_value": 146.02499999999998,
+      "baseline_formatted": "20周+6天",
+      "simulation_mean": 147.92050000000003,
+      "simulation_formatted": "21周",
+      "difference": 1.8955000000000553,
+      "coefficient_of_variation": 0.015986019995253113
+    }
+  },
+  "time_2.0": {
+    "50": {
+      "baseline_value": 97.875,
+      "baseline_formatted": "13周+6天",
+      "simulation_mean": 98.02253480700554,
+      "simulation_formatted": "14周",
+      "difference": 0.14753480700554178,
+      "coefficient_of_variation": 0.004028951895461271
+    },
+    "90": {
+      "baseline_value": 146.02499999999998,
+      "baseline_formatted": "20周+6天",
+      "simulation_mean": 147.66615449353338,
+      "simulation_formatted": "21周",
+      "difference": 1.6411544935334064,
+      "coefficient_of_variation": 0.005125149313693
+    }
+  },
+  "time_5.0": {
+    "50": {
+      "baseline_value": 97.875,
+      "baseline_formatted": "13周+6天",
+      "simulation_mean": 98.51704799464655,
+      "simulation_formatted": "14周",
+      "difference": 0.6420479946465463,
+      "coefficient_of_variation": 0.006606068226213783
+    },
+    "90": {
+      "baseline_value": 146.02499999999998,
+      "baseline_formatted": "20周+6天",
+      "simulation_mean": 148.02394354076793,
+      "simulation_formatted": "21周+1天",
+      "difference": 1.9989435407679537,
+      "coefficient_of_variation": 0.00780954800990199
+    }
+  },
+  "y_0.05_time_2.0": {
+    "50": {
+      "baseline_value": 97.875,
+      "baseline_formatted": "13周+6天",
+      "simulation_mean": 99.60346626531282,
+      "simulation_formatted": "14周+1天",
+      "difference": 1.728466265312818,
+      "coefficient_of_variation": 0.008943292050825785
+    },
+    "90": {
+      "baseline_value": 146.02499999999998,
+      "baseline_formatted": "20周+6天",
+      "simulation_mean": 146.96347921319398,
+      "simulation_formatted": "20周+6天",
+      "difference": 0.9384792131940003,
+      "coefficient_of_variation": 0.01676581564081026
+    }
+  },
+  "y_0.05_time_5.0": {
+    "50": {
+      "baseline_value": 97.875,
+      "baseline_formatted": "13周+6天",
+      "simulation_mean": 100.23025250745515,
+      "simulation_formatted": "14周+2天",
+      "difference": 2.3552525074551482,
+      "coefficient_of_variation": 0.013917478265453847
+    },
+    "90": {
+      "baseline_value": 146.02499999999998,
+      "baseline_formatted": "20周+6天",
+      "simulation_mean": 147.2353835861606,
+      "simulation_formatted": "21周",
+      "difference": 1.2103835861606171,
+      "coefficient_of_variation": 0.01672054734373595
+    }
+  },
+  "y_0.1_time_2.0": {
+    "50": {
+      "baseline_value": 97.875,
+      "baseline_formatted": "13周+6天",
+      "simulation_mean": 101.41989913024861,
+      "simulation_formatted": "14周+3天",
+      "difference": 3.5448991302486093,
+      "coefficient_of_variation": 0.016264917409452472
+    },
+    "90": {
+      "baseline_value": 146.02499999999998,
+      "baseline_formatted": "20周+6天",
+      "simulation_mean": 148.07041298882876,
+      "simulation_formatted": "21周+1天",
+      "difference": 2.0454129888287866,
+      "coefficient_of_variation": 0.014099698760165253
+    }
+  },
+  "y_0.1_time_5.0": {
+    "50": {
+      "baseline_value": 97.875,
+      "baseline_formatted": "13周+6天",
+      "simulation_mean": 101.96020375121208,
+      "simulation_formatted": "14周+3天",
+      "difference": 4.085203751212077,
+      "coefficient_of_variation": 0.016856274519096142
+    },
+    "90": {
+      "baseline_value": 146.02499999999998,
+      "baseline_formatted": "20周+6天",
+      "simulation_mean": 148.95597973313042,
+      "simulation_formatted": "21周+1天",
+      "difference": 2.9309797331304424,
+      "coefficient_of_variation": 0.02158325904695265
+    }
+  }
+}
