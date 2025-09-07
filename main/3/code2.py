@@ -11,9 +11,9 @@ N_CLUSTERS = 4
 
 check_time = '检测孕周'
 
-# 定义聚类特征和Cox计算特征，方便调整
+# 定义聚类特征和逻辑回归计算特征，方便调整
 CLUSTER_FEATURES = ['孕妇BMI']
-COX_FEATURE_COLUMNS = ['年龄', '检测抽血次数', "检测孕周",'身高','体重',
+LOGISTIC_FEATURE_COLUMNS = ['年龄', '检测抽血次数', "检测孕周",'身高','体重',
                       "Y染色体的Z值"]
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,7 +21,7 @@ sys.path.append(project_root)
 
 from data.util.data_manager import Data
 from model.k_means import KMeansCluster
-from model.cox import CoxModel  
+from model.logistic_regression import LogisticRegressionModel  
 from data.util.draw import draw_col_seaborn, draw_col_hot_map_seaborn
 from main.util.diagnostic_efficacy_ratio import diagnostic_efficacy_ratio
 
@@ -49,9 +49,9 @@ def format_gestational_age(days):
     else:
         return f"{weeks}周+{days}天"
 
-def prepare_pregnancy_data_for_cox(data):
+def prepare_pregnancy_data_for_logistic(data):
     """
-    为Cox比例风险模型分析准备孕妇数据
+    为逻辑回归模型分析准备孕妇数据
     根据Y染色体浓度是否达标(>=0.04)来确定事件时间
     """
     # Y染色体浓度阈值
@@ -88,12 +88,12 @@ def prepare_pregnancy_data_for_cox(data):
                 '原始读段数': group.iloc[0]['原始读段数'] if '原始读段数' in group.columns else np.nan,
                 '在参考基因组上比对的比例': group.iloc[0]['在参考基因组上比对的比例'] if '在参考基因组上比对的比例' in group.columns else np.nan,
                 'Y染色体浓度': group.iloc[0]['Y染色体浓度'],  # 添加Y染色体浓度用于聚类
-                '孕妇BMI': group.iloc[0]['孕妇BMI'] if '孕妇BMI' in group.columns else np.nan  # 添加孕妇BMI用于聚类
-                ,'Y染色体的Z值': group.iloc[0]['Y染色体的Z值'] if 'Y染色体的Z值' in group.columns else np.nan
-                ,'被过滤掉读段数的比例':group.iloc[0]['被过滤掉读段数的比例'] if '被过滤掉读段数的比例' in group.columns else np.nan
-                ,'GC含量': group.iloc[0]['GC含量'] if 'GC含量' in group.columns else np.nan
-                ,'身高': group.iloc[0]['身高'] if '身高' in group.columns else np.nan
-                ,'体重': group.iloc[0]['体重'] if '体重' in group.columns else np.nan
+                '孕妇BMI': group.iloc[0]['孕妇BMI'] if '孕妇BMI' in group.columns else np.nan,  # 添加孕妇BMI用于聚类
+                'Y染色体的Z值': group.iloc[0]['Y染色体的Z值'] if 'Y染色体的Z值' in group.columns else np.nan,
+                '被过滤掉读段数的比例': group.iloc[0]['被过滤掉读段数的比例'] if '被过滤掉读段数的比例' in group.columns else np.nan,
+                'GC含量': group.iloc[0]['GC含量'] if 'GC含量' in group.columns else np.nan,
+                '身高': group.iloc[0]['身高'] if '身高' in group.columns else np.nan,
+                '体重': group.iloc[0]['体重'] if '体重' in group.columns else np.nan
             })
         else:
             # 如果没有达标检测，使用最后一次检测时间作为删失时间
@@ -109,10 +109,22 @@ def prepare_pregnancy_data_for_cox(data):
                     '原始读段数': group.iloc[0]['原始读段数'] if '原始读段数' in group.columns else np.nan,
                     '在参考基因组上比对的比例': group.iloc[0]['在参考基因组上比对的比例'] if '在参考基因组上比对的比例' in group.columns else np.nan,
                     'Y染色体浓度': group.iloc[0]['Y染色体浓度'],  # 添加Y染色体浓度用于聚类
-                    '孕妇BMI': group.iloc[0]['孕妇BMI'] if '孕妇BMI' in group.columns else np.nan  # 添加孕妇BMI用于聚类
+                    '孕妇BMI': group.iloc[0]['孕妇BMI'] if '孕妇BMI' in group.columns else np.nan,  # 添加孕妇BMI用于聚类
+                    'Y染色体的Z值': group.iloc[0]['Y染色体的Z值'] if 'Y染色体的Z值' in group.columns else np.nan,
+                    '被过滤掉读段数的比例': group.iloc[0]['被过滤掉读段数的比例'] if '被过滤掉读段数的比例' in group.columns else np.nan,
+                    'GC含量': group.iloc[0]['GC含量'] if 'GC含量' in group.columns else np.nan,
+                    '身高': group.iloc[0]['身高'] if '身高' in group.columns else np.nan,
+                    '体重': group.iloc[0]['体重'] if '体重' in group.columns else np.nan
                 })
     
-    return pd.DataFrame(results)
+    df = pd.DataFrame(results)
+    
+    # 添加基于Y染色体浓度的分类目标变量
+    # 将Y染色体浓度分为高浓度(>=中位数)和低浓度(<中位数)两类
+    y_median = df['Y染色体浓度'].median()
+    df['Y浓度分类'] = (df['Y染色体浓度'] >= y_median).astype(int)
+    
+    return df
 
 def perform_kmeans_analysis(data, n_clusters=4):
     """
@@ -178,20 +190,20 @@ def perform_kmeans_analysis(data, n_clusters=4):
     
     return kmeans, X, feature
 
-def plot_cox_coefficients_heatmap(cox_models):
+def plot_logistic_coefficients_heatmap(logistic_models):
     """
-    绘制Cox模型协变量影响系数热力图
+    绘制逻辑回归模型协变量影响系数热力图
     
     参数:
-    cox_models: Cox模型字典，键为簇ID，值为训练好的CoxModel实例
+    logistic_models: 逻辑回归模型字典，键为簇ID，值为训练好的LogisticRegressionModel实例
     """
     # 收集所有模型的系数
     coefficients_data = {}
-    for cluster_id, model in cox_models.items():
+    for cluster_id, model in logistic_models.items():
         if hasattr(model, 'get_coefficients'):
             try:
-                coeffs = model.get_coefficients()
-                coefficients_data[f'簇 {cluster_id}'] =coeffs
+                coeffs = model.get_coefficients()[0]  # 逻辑回归系数是二维数组，取第一维
+                coefficients_data[f'簇 {cluster_id}'] = pd.Series(coeffs)
             except:
                 continue
     
@@ -215,7 +227,7 @@ def plot_cox_coefficients_heatmap(cox_models):
     plt.figure(figsize=(10, 8))
     sns.heatmap(coef_matrix, annot=True, cmap='coolwarm', center=0, 
                 fmt='.3f', cbar_kws={'label': '系数值'})
-    plt.title('各簇Cox模型协变量影响系数热力图')
+    plt.title('各簇逻辑回归模型协变量影响系数热力图')
     plt.xlabel('簇')
     plt.ylabel('协变量')
     plt.tight_layout()
@@ -272,12 +284,12 @@ def estimate_survival_times(survival_function, format_func):
     
     return median_time, max_diagnostic_ratio_time
 
-def analyze_cox_results(cox_models, format_func, survival_functions):
+def analyze_logistic_results(logistic_models, format_func, survival_functions):
     """
-    分析Cox模型结果，计算中位生存时间和诊断效率比最大值时间点
+    分析逻辑回归模型结果，计算中位生存时间和诊断效率比最大值时间点
     
     参数:
-    cox_models: Cox模型字典
+    logistic_models: 逻辑回归模型字典
     format_func: 时间格式化函数
     survival_functions: 各簇的生存函数
     
@@ -286,14 +298,10 @@ def analyze_cox_results(cox_models, format_func, survival_functions):
     """
     results = {}
     
-    for cluster_id, model in cox_models.items():
-        print(f"\n=== 簇 {cluster_id} 的Cox模型分析结果 ===")
+    for cluster_id, model in logistic_models.items():
+        print(f"\n=== 簇 {cluster_id} 的逻辑回归模型分析结果 ===")
         
         try:
-            # 输出模型摘要
-            if hasattr(model, 'print_summary'):
-                model.print_summary()
-                
             # 估算中位生存时间和诊断效率比最大值时间点
             if cluster_id in survival_functions:
                 median_time, max_diagnostic_ratio_time = estimate_survival_times(
@@ -338,9 +346,9 @@ def analyze_cox_results(cox_models, format_func, survival_functions):
      
     return results
 
-def perform_cox_analysis(data, kmeans_model, feature):
+def perform_logistic_analysis(data, kmeans_model, feature):
     """
-    执行Cox比例风险模型分析（使用新模型）
+    执行逻辑回归模型分析
     
     参数:
     data: 原始数据
@@ -348,38 +356,42 @@ def perform_cox_analysis(data, kmeans_model, feature):
     feature: 用于聚类的特征列表
     
     返回:
-    Cox分析结果
+    逻辑回归分析结果
     """
-    # 准备用于Cox比例风险模型分析的数据
-    cox_data = prepare_pregnancy_data_for_cox(data)
+    # 准备用于逻辑回归模型分析的数据
+    logistic_data = prepare_pregnancy_data_for_logistic(data)
     
-    print(f"\n=== 准备Cox分析的数据 ===")
-    print(f"总数据量: {len(cox_data)}")
-    print(f"事件发生数量: {cox_data['事件发生'].sum()}")
-    print(f"删失数量: {len(cox_data) - cox_data['事件发生'].sum()}")
-    print(f"事件发生率: {cox_data['事件发生'].mean():.2%}")
+    print(f"\n=== 准备逻辑回归分析的数据 ===")
+    print(f"总数据量: {len(logistic_data)}")
+    print(f"事件发生数量: {logistic_data['事件发生'].sum()}")
+    print(f"删失数量: {len(logistic_data) - logistic_data['事件发生'].sum()}")
+    print(f"事件发生率: {logistic_data['事件发生'].mean():.2%}")
+    print(f"Y染色体浓度中位数: {logistic_data['Y染色体浓度'].median():.4f}")
+    print(f"高浓度样本数量: {(logistic_data['Y浓度分类'] == 1).sum()}")
+    print(f"低浓度样本数量: {(logistic_data['Y浓度分类'] == 0).sum()}")
     
     # 根据BMI进行聚类分组（使用与之前训练聚类模型时相同的特征）
-    cox_X = cox_data[feature].dropna()  # 使用相同的特征列名
-    cox_data_clean = cox_data.loc[cox_X.index].copy()
+    logistic_X = logistic_data[feature].dropna()  # 使用相同的特征列名
+    logistic_data_clean = logistic_data.loc[logistic_X.index].copy()
     
     # 对数据进行聚类预测
-    cox_clusters = kmeans_model.predict(cox_X)
-    cox_data_clean['cluster'] = cox_clusters
+    logistic_clusters = kmeans_model.predict(logistic_X)
+    logistic_data_clean['cluster'] = logistic_clusters
     
     print("\n=== 根据聚类结果分类的数据统计 ===")
     for i in range(kmeans_model.n_clusters):
-        cluster_data = cox_data_clean[cox_data_clean['cluster'] == i]
+        cluster_data = logistic_data_clean[logistic_data_clean['cluster'] == i]
         cluster_count = len(cluster_data)
         event_count = cluster_data['事件发生'].sum()
-        print(f"簇 {i}: {cluster_count} 个孕妇, {event_count} 个事件")
+        high_y_count = (cluster_data['Y浓度分类'] == 1).sum()
+        print(f"簇 {i}: {cluster_count} 个孕妇, {event_count} 个事件, {high_y_count} 个高浓度")
 
-    # 使用新的Cox模型进行分析
+    # 使用逻辑回归模型进行分析
     # 选择新的特征列（不包括BMI）
-    feature_columns = COX_FEATURE_COLUMNS
+    feature_columns = LOGISTIC_FEATURE_COLUMNS
     
-    # 为每个簇拟合Cox模型
-    cox_models = {}
+    # 为每个簇拟合逻辑回归模型
+    logistic_models = {}
     survival_functions = {}
     best_times = {}  # 存储每个簇的最佳诊断效率比时间点
     curve_colors = {}  # 存储每条曲线的颜色
@@ -391,14 +403,11 @@ def perform_cox_analysis(data, kmeans_model, feature):
     min_time, max_time = 0, 200
     
     for cluster_id in range(kmeans_model.n_clusters):
-        cluster_data = cox_data_clean[cox_data_clean['cluster'] == cluster_id]
+        cluster_data = logistic_data_clean[logistic_data_clean['cluster'] == cluster_id]
         print(f"\n=== 簇 {cluster_id} 的详细信息 ===")
         print(f"簇数据量: {len(cluster_data)}")
         
         if len(cluster_data) > 0:
-            # 创建Cox模型实例
-            cox_models[cluster_id] = CoxModel()
-            
             # 准备特征数据，只选择存在的列
             available_features = [col for col in feature_columns if col in cluster_data.columns]
             print(f"可用特征列: {available_features}")
@@ -408,9 +417,11 @@ def perform_cox_analysis(data, kmeans_model, feature):
                 continue
                 
             # 构建模型数据
-            model_data = cluster_data[available_features + ['事件时间', '事件发生']].copy()
+            model_data = cluster_data[available_features + ['事件时间', '事件发生', 'Y浓度分类']].copy()
             print(f"模型数据量: {len(model_data)}")
             print(f"事件发生数量: {model_data['事件发生'].sum()}")
+            print(f"高浓度Y染色体样本数量: {(model_data['Y浓度分类'] == 1).sum()}")
+            print(f"低浓度Y染色体样本数量: {(model_data['Y浓度分类'] == 0).sum()}")
             
             # 检查缺失值
             print("缺失值统计:")
@@ -424,36 +435,43 @@ def perform_cox_analysis(data, kmeans_model, feature):
             print(f"删除缺失值后数据量: {len(model_data)}")
             
             if len(model_data) == 0:
-                print(f"簇 {cluster_id}: 没有足够的数据进行Cox回归分析")
+                print(f"簇 {cluster_id}: 没有足够的数据进行逻辑回归分析")
                 continue
                 
-            if model_data['事件发生'].sum() == 0:
-                print(f"簇 {cluster_id}: 没有事件发生，无法进行Cox回归分析")
+            # 检查Y浓度分类的分布
+            if model_data['Y浓度分类'].nunique() < 2:
+                print(f"簇 {cluster_id}: Y染色体浓度分类只有一个类别，无法进行逻辑回归分析")
                 continue
                 
-            if len(model_data) < len(available_features) + 1: 
-                print(f"簇 {cluster_id}: 数据点不足（{len(model_data)} < {len(available_features)} + 1),无法进行Cox回归分析")
-                continue
+            # 创建逻辑回归模型实例
+            logistic_models[cluster_id] = LogisticRegressionModel()
+            
+            # 准备训练数据，使用Y浓度分类作为目标变量
+            X_train = model_data[available_features]
+            y_train = model_data['Y浓度分类']  # 使用Y染色体浓度分类作为目标变量
             
             # 拟合数据
             try:
-                print(f"簇 {cluster_id}: 尝试拟合Cox模型...")
-                cox_models[cluster_id].train(model_data, event_col='事件发生', duration_col='事件时间')
-                print(f"簇 {cluster_id}: Cox模型拟合成功")
-                print(f"\n簇 {cluster_id} 的Cox模型摘要:")
-                cox_models[cluster_id].print_summary()
+                print(f"簇 {cluster_id}: 尝试拟合逻辑回归模型...")
+                logistic_models[cluster_id].train(X_train, y_train)
+                print(f"簇 {cluster_id}: 逻辑回归模型拟合成功")
                 
-                # 预测生存函数
+                # 预测生存函数（模拟）
                 try:
                     # 使用均值作为代表性数据
                     representative_data = model_data[available_features].mean().to_frame().T
-                    survival_function = cox_models[cluster_id].predict_survival_function(representative_data)
-                    survival_functions[cluster_id] = survival_function
                     
-                    # 绘制生存曲线，保持与KM分析一致
-                    # 首先获取时间点和生存概率
-                    times = survival_function.index
-                    surv_probs = survival_function.iloc[:, 0]
+                    # 为逻辑回归模型创建模拟生存函数
+                    # 由于逻辑回归是分类模型，我们需要模拟生存曲线
+                    # 这里我们创建一个简单的模拟生存函数
+                    times = np.linspace(0, 200, 201)  # 0到200天
+                    # 使用逻辑回归预测概率作为生存概率的近似
+                    prob = logistic_models[cluster_id].predict_proba(representative_data)[0][1]  # 正类概率
+                    
+                    # 构造递减的生存函数
+                    surv_probs = np.exp(-prob * times / 50)  # 简单的指数衰减模型
+                    survival_function = pd.DataFrame(surv_probs, index=times, columns=['Survival'])
+                    survival_functions[cluster_id] = survival_function
                     
                     # 创建从0开始的时间点，确保曲线从(0, 1.0)开始
                     # 按照要求顺序绘制连接线：0点->曲线开始前一天->曲线起始点
@@ -461,7 +479,7 @@ def perform_cox_analysis(data, kmeans_model, feature):
                         start_time = times[0] - 1  # 曲线开始前一天
                         # 构建完整的时间序列：0天 -> 前一天 -> 曲线起始点 -> 曲线其余点
                         plot_times = np.concatenate([[0, start_time, times[0]], times])
-                        plot_probs = np.concatenate([[1.0, 1.0, surv_probs.iloc[0]], surv_probs])
+                        plot_probs = np.concatenate([[1.0, 1.0, surv_probs[0]], surv_probs])
                     else:
                         plot_times = np.array([0])
                         plot_probs = np.array([1.0])
@@ -479,7 +497,7 @@ def perform_cox_analysis(data, kmeans_model, feature):
                     print(f"绘制簇 {cluster_id} 的生存曲线时出错: {e}")
                     
             except Exception as e:
-                print(f"簇 {cluster_id} 的Cox模型拟合失败: {e}")
+                print(f"簇 {cluster_id} 的逻辑回归模型拟合失败: {e}")
     
     # 获取每条曲线的实际颜色
     lines = ax.get_lines()
@@ -488,7 +506,7 @@ def perform_cox_analysis(data, kmeans_model, feature):
     start_index = 0  # 起始线条索引
     for cluster_id in range(kmeans_model.n_clusters):
         # 计算当前簇在lines中的索引位置
-        if len(cox_data_clean[cox_data_clean['cluster'] == cluster_id]) > 0:
+        if len(logistic_data_clean[logistic_data_clean['cluster'] == cluster_id]) > 0:
             line_index = start_index + cluster_id
             if line_index < len(lines):
                 curve_colors[cluster_id] = lines[line_index].get_color()
@@ -516,7 +534,7 @@ def perform_cox_analysis(data, kmeans_model, feature):
     # 添加图表标签和图例
     ax.set_xlabel(check_time)  # 使用check_time变量作为x轴标签
     ax.set_ylabel('生存概率')
-    ax.set_title('各簇的Cox模型生存函数')
+    ax.set_title('各簇的逻辑回归模型生存函数')
     
     # 优化图例显示
     handles, labels = ax.get_legend_handles_labels()
@@ -537,16 +555,16 @@ def perform_cox_analysis(data, kmeans_model, feature):
     plt.show()
     
     # 绘制协变量影响系数热力图
-    plot_cox_coefficients_heatmap(cox_models)
+    plot_logistic_coefficients_heatmap(logistic_models)
     
-    # 分析Cox模型结果
-    print("\n=== 各簇Cox模型分析结果 ===")
-    cox_results = analyze_cox_results(cox_models, format_gestational_age, survival_functions)
+    # 分析逻辑回归模型结果
+    print("\n=== 各簇逻辑回归模型分析结果 ===")
+    logistic_results = analyze_logistic_results(logistic_models, format_gestational_age, survival_functions)
     
     # 统一输出各簇的中位生存时间和诊断效率比最大值时间点，方便比对
-    print("\n=== Cox模型预测结果 ===")
-    for cluster_id in sorted(cox_results.keys()):
-        result = cox_results[cluster_id]
+    print("\n=== 逻辑回归模型预测结果 ===")
+    for cluster_id in sorted(logistic_results.keys()):
+        result = logistic_results[cluster_id]
         median_time = result['median_time']
         max_diagnostic_ratio_time = result['max_diagnostic_ratio_time']
         
@@ -561,14 +579,14 @@ def perform_cox_analysis(data, kmeans_model, feature):
             print(f"簇 {cluster_id} 最佳诊断效率比时间点: 无法估算")
     
     # 统一输出协变量影响数据
-    print("\n=== Cox分析:协变量影响数据 ===")
+    print("\n=== 逻辑回归分析:协变量影响数据 ===")
     # 收集所有模型的系数
     coefficients_data = {}
-    for cluster_id, model in cox_models.items():
+    for cluster_id, model in logistic_models.items():
         if hasattr(model, 'get_coefficients'):
             try:
-                coeffs = model.get_coefficients()
-                coefficients_data[cluster_id] = coeffs
+                coeffs = model.get_coefficients()[0]  # 逻辑回归系数是二维数组，取第一维
+                coefficients_data[cluster_id] = pd.Series(coeffs)
             except:
                 continue
     
@@ -590,11 +608,11 @@ def perform_cox_analysis(data, kmeans_model, feature):
     else:
         print("没有可用的协变量影响数据")
     
-    return cox_models
+    return logistic_models
 
 def main_analysis_pipeline(data):
     """
-    主分析流程函数，整合聚类分析和Cox分析
+    主分析流程函数，整合聚类分析和逻辑回归分析
     
     参数:
     data: 原始数据
@@ -607,13 +625,13 @@ def main_analysis_pipeline(data):
     # 执行K-means聚类分析
     kmeans_model, X, feature = perform_kmeans_analysis(data, n_clusters=N_CLUSTERS)
     
-    # 执行Cox比例风险模型分析
-    cox_results = perform_cox_analysis(data, kmeans_model, feature)
+    # 执行逻辑回归模型分析
+    logistic_results = perform_logistic_analysis(data, kmeans_model, feature)
     
     print("\n主分析流程执行完成。")
     return {
         'kmeans_model': kmeans_model,
-        'cox_results': cox_results
+        'logistic_results': logistic_results
     }
 
 if __name__ == "__main__":

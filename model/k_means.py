@@ -268,7 +268,7 @@ if __name__ == "__main__":
     X = data[feature].dropna()
     
     # 创建并训练K-means模型
-    kmeans = KMeansCluster(n_clusters=3)
+    kmeans = KMeansCluster(n_clusters=4)
     kmeans.train(X)
     
     plot_elbow_method(X, max_clusters=10)

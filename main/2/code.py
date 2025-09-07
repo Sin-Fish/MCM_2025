@@ -342,6 +342,10 @@ def perform_km_analysis(data, kmeans_model, feature):
     # 添加50%的参考线（中位生存时间参考线）
     ax.axhline(y=0.5, color='red', linestyle='--', alpha=0.7, label='生存概率中位线')
     
+    # 设置y轴刻度间隔为0.1
+    from matplotlib.ticker import MultipleLocator
+    ax.yaxis.set_major_locator(MultipleLocator(0.1))
+    
     ax.set_xlabel(check_time)
     ax.set_ylabel('未达标概率')
     ax.set_title('各簇的Kaplan-Meier未达标概率曲线')

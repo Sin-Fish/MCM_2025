@@ -6,7 +6,7 @@ config = {
 
 }
 
-#file_name = "cleaned_data_female"
+file_name = "cleaned_data_female"
 
 file_name = "new_cleaned_data_male"
 
