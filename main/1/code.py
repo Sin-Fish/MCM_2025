@@ -9,7 +9,7 @@ from model.MultiLinearRegressor import MultiLinearRegressor
 
 if __name__ == "__main__":  
     data = Data.data
-    X = data[['更新孕周', '孕妇BMI']]
+    X = data[['检测孕周', '孕妇BMI','检测抽血次数']]
     y = data['Y染色体浓度']
     regressor = MultiLinearRegressor()
     regressor.train(X, y)
